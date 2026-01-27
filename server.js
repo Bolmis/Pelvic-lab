@@ -377,7 +377,7 @@ const docs = [
     { file: 'pelviclab-booking-component.md', title: 'Booking Component', slug: 'booking' },
     { file: 'pelviclab-webshop-component.md', title: 'Webshop Component', slug: 'webshop' },
     { file: 'pelvic-api-docs.md', title: 'API Documentation', slug: 'api' },
-    { file: 'zoezi-pelvix-starter-docs.md', title: 'PelviX Starter Component', slug: 'pelvix-starter' }
+    { file: 'zoezi-pelvix-starter-COMPLETE.md', title: 'PelviX Starter Component', slug: 'pelvix-starter' }
 ];
 
 const generateSidebar = (activeSlug) => {
