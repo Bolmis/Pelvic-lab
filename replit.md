@@ -56,14 +56,14 @@ node server.js
 
 ### Start PelviX Session
 ```bash
-curl -X POST https://your-replit-url.replit.app/api/start-pelvix \
+curl -X POST https://298a9f30-5c19-44f4-8a22-7887a16908af-00-23a7i7oye5ln.picard.replit.dev/api/start-pelvix \
   -H "Content-Type: application/json" \
   -d '{"patientId": "user-123", "patientName": "John Doe"}'
 ```
 
 ### Health Check
 ```bash
-curl https://your-replit-url.replit.app/api/health
+curl https://298a9f30-5c19-44f4-8a22-7887a16908af-00-23a7i7oye5ln.picard.replit.dev/api/health
 ```
 
 ## Zoezi Component Integration

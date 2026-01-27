@@ -139,7 +139,7 @@ export default {
     apiUrl: {
       title: 'Backend API URL',
       type: String,
-      default: 'https://pelvic-lab.replit.app'
+      default: 'https://298a9f30-5c19-44f4-8a22-7887a16908af-00-23a7i7oye5ln.picard.replit.dev'
     }
   },
 
