@@ -216,10 +216,10 @@ async function unlockDevice(patientId, patientName, transactionId, remainingUnit
     patientId: patientId,
     patientName: patientName,
     remainingTrainingUnits: remainingUnits,
-    availableTreatments: null,
+    availableTreatments: [],
     presets: {},
     unlockTimeOutInSeconds: 300,
-    graphicBase64: null,
+    graphicBase64: "",
     transactionId: transactionId
   };
 
