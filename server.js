@@ -145,11 +145,11 @@ const PELVIC_ENV = process.env.PELVIC_ENV || 'development';
 
 const PELVIC_CONFIG = {
   development: {
-    baseUrl: 'https://dev.pelvipower.io',
+    baseUrl: 'https://middleware.dev.pelvipower.io',
     tokenUrl: 'https://login.dev.pelvipower.io/realms/ThirdParty/protocol/openid-connect/token'
   },
   production: {
-    baseUrl: 'https://pelvipower.io',
+    baseUrl: 'https://middleware.pelvipower.io',
     tokenUrl: 'https://login.pelvipower.io/realms/ThirdParty/protocol/openid-connect/token'
   }
 };
