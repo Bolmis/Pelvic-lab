@@ -83,6 +83,10 @@ async function verifyActiveResourceBooking(userId) {
   // Active = (start time - 5 min) <= now <= (start time + duration)
   const earlyStartMinutes = 5;
 
+  // Get current time in Stockholm timezone for comparison
+  const nowStockholm = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Stockholm' }));
+  console.log(`[Zoezi] Current time (Stockholm): ${nowStockholm.toLocaleString('sv-SE')}`);
+
   for (const booking of bookings) {
     if (booking.user_id !== parseInt(userId) && String(booking.user_id) !== String(userId)) {
       continue;
@@ -92,15 +96,22 @@ async function verifyActiveResourceBooking(userId) {
       continue;
     }
 
-    const bookingStart = new Date(booking.time.replace(' ', 'T'));
+    // booking.time is in Stockholm local time (e.g., "2026-01-28 10:00:00")
+    // Parse it directly as local time components
+    const [datePart, timePart] = booking.time.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute, second] = timePart.split(':').map(Number);
+
+    // Create dates using local time components for comparison
+    const bookingStart = new Date(year, month - 1, day, hour, minute, second || 0);
     const duration = booking.duration || 60;
     const bookingEnd = new Date(bookingStart.getTime() + duration * 60 * 1000);
     const earlyStart = new Date(bookingStart.getTime() - earlyStartMinutes * 60 * 1000);
 
     console.log(`[Zoezi] Checking booking: ${booking.time}, duration: ${duration}min, user: ${booking.user_id}`);
-    console.log(`[Zoezi]   Early start: ${earlyStart.toISOString()}, End: ${bookingEnd.toISOString()}, Now: ${now.toISOString()}`);
+    console.log(`[Zoezi]   Early start: ${earlyStart.toLocaleString('sv-SE')}, End: ${bookingEnd.toLocaleString('sv-SE')}, Now: ${nowStockholm.toLocaleString('sv-SE')}`);
 
-    if (now >= earlyStart && now <= bookingEnd) {
+    if (nowStockholm >= earlyStart && nowStockholm <= bookingEnd) {
       console.log('[Zoezi] Found active booking!');
       return { hasActiveBooking: true, booking: booking };
     }
