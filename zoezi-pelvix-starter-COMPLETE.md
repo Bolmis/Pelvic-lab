@@ -79,7 +79,11 @@ The backend (Replit) needs these environment variables:
           </svg>
         </div>
         <h2 class="pxs-card-title">Ingen bokning just nu</h2>
-        <p class="pxs-card-text" v-if="nextBookingTime">
+        <p class="pxs-card-text" v-if="nextBookingCountdown">
+          Din nästa bokning börjar om <strong>{{ nextBookingCountdown }}</strong>.<br>
+          Du kan starta stolen 5 minuter innan.
+        </p>
+        <p class="pxs-card-text" v-else-if="nextBookingTime">
           Din nästa bokning börjar <strong>{{ nextBookingTime }}</strong>.<br>
           Du kan starta stolen 5 minuter innan eller under bokningen.
         </p>
@@ -233,7 +237,8 @@ export default {
       errorMessage: '',
       upcomingBooking: null,
       nextBooking: null,
-      refreshInterval: null
+      refreshInterval: null,
+      currentTime: new Date()
     };
   },
 
@@ -272,6 +277,26 @@ export default {
       if (!this.nextBooking) return '';
       const time = new Date(this.nextBooking.time.replace(' ', 'T'));
       return 'kl. ' + time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    nextBookingCountdown() {
+      if (!this.nextBooking || !this.currentTime) return '';
+      const bookingTime = new Date(this.nextBooking.time.replace(' ', 'T'));
+      const diffMs = bookingTime.getTime() - this.currentTime.getTime();
+
+      // Only show countdown if within 1 hour
+      if (diffMs <= 0 || diffMs > 60 * 60 * 1000) return '';
+
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffSec = Math.floor((diffMs % 60000) / 1000);
+
+      if (diffMin >= 60) {
+        return '';
+      } else if (diffMin > 0) {
+        return diffMin + ' min ' + diffSec + ' sek';
+      } else {
+        return diffSec + ' sekunder';
+      }
     }
   },
 
@@ -431,12 +456,13 @@ export default {
     // Check bookings immediately
     this.checkBookings();
 
-    // Refresh every 30 seconds
+    // Refresh bookings and update countdown every 10 seconds
     this.refreshInterval = setInterval(() => {
+      this.currentTime = new Date();
       if (this.status !== 'started' && this.status !== 'error') {
         this.checkBookings();
       }
-    }, 30000);
+    }, 10000);
   },
 
   beforeDestroy() {
