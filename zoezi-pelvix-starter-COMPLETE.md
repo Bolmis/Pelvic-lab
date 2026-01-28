@@ -81,7 +81,7 @@ The backend (Replit) needs these environment variables:
         <h2 class="pxs-card-title">Ingen bokning just nu</h2>
         <p class="pxs-card-text" v-if="nextBookingTime">
           Din nästa bokning börjar <strong>{{ nextBookingTime }}</strong>.<br>
-          Kom tillbaka 5 minuter innan för att starta stolen.
+          Du kan starta stolen 5 minuter innan eller under bokningen.
         </p>
         <p class="pxs-card-text" v-else>
           Du har ingen PelviX-bokning idag.<br>
@@ -99,7 +99,7 @@ The backend (Replit) needs these environment variables:
         </div>
         <h2 class="pxs-card-title">Redo att börja?</h2>
         <p class="pxs-card-text">
-          Din bokning börjar <strong>{{ upcomingBookingTime }}</strong>.<br>
+          Din bokning: <strong>{{ activeBookingTimeRange }}</strong>.<br>
           Tryck på knappen för att låsa upp stolen.
         </p>
 
@@ -258,10 +258,14 @@ export default {
       return user.name || user.firstName || user.email || '';
     },
 
-    upcomingBookingTime() {
+    activeBookingTimeRange() {
       if (!this.upcomingBooking) return '';
-      const time = new Date(this.upcomingBooking.time.replace(' ', 'T'));
-      return time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      const start = new Date(this.upcomingBooking.time.replace(' ', 'T'));
+      const duration = this.upcomingBooking.duration || 60;
+      const end = new Date(start.getTime() + duration * 60 * 1000);
+      const startStr = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      const endStr = end.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      return startStr + ' - ' + endStr;
     },
 
     nextBookingTime() {
@@ -306,10 +310,9 @@ export default {
 
         console.log('PelviX: Checking bookings', bookings);
 
-        const windowMs = this.bookingWindowMinutes * 60 * 1000;
-        const windowEnd = new Date(now.getTime() + windowMs);
+        const earlyStartMs = this.bookingWindowMinutes * 60 * 1000;
 
-        let upcomingBooking = null;
+        let activeBooking = null;
         let nextBooking = null;
         let allBookings = [];
 
@@ -319,38 +322,47 @@ export default {
             if (category.bookings) {
               category.bookings.forEach(booking => {
                 if (!booking.cancelled) {
-                  const bookingTime = new Date(booking.time.replace(' ', 'T'));
-                  allBookings.push({ ...booking, parsedTime: bookingTime });
+                  const bookingStart = new Date(booking.time.replace(' ', 'T'));
+                  const duration = booking.duration || 60; // default 60 min if not specified
+                  const bookingEnd = new Date(bookingStart.getTime() + duration * 60 * 1000);
+                  allBookings.push({ ...booking, parsedStart: bookingStart, parsedEnd: bookingEnd });
                 }
               });
             }
           });
         }
 
-        // Sort by time
-        allBookings.sort((a, b) => a.parsedTime - b.parsedTime);
+        // Sort by start time
+        allBookings.sort((a, b) => a.parsedStart - b.parsedStart);
 
-        // Find upcoming booking (within window) and next booking (future)
+        // Find active booking or next upcoming booking
         for (const booking of allBookings) {
-          const bookingTime = booking.parsedTime;
+          const bookingStart = booking.parsedStart;
+          const bookingEnd = booking.parsedEnd;
+          const earlyStart = new Date(bookingStart.getTime() - earlyStartMs);
 
-          // Check if booking is within the start window (now <= bookingTime <= now + windowMs)
-          if (bookingTime >= now && bookingTime <= windowEnd) {
-            upcomingBooking = booking;
-            console.log('PelviX: Found booking within window', booking.time);
+          console.log('PelviX: Checking booking', booking.time, 'duration:', booking.duration);
+          console.log('  Can start from:', earlyStart.toLocaleTimeString('sv-SE'));
+          console.log('  Booking ends at:', bookingEnd.toLocaleTimeString('sv-SE'));
+          console.log('  Current time:', now.toLocaleTimeString('sv-SE'));
+
+          // Check if booking is active: (start - 5min) <= now <= end
+          if (now >= earlyStart && now <= bookingEnd) {
+            activeBooking = booking;
+            console.log('PelviX: Found active booking!');
             break;
           }
 
-          // Track next future booking
-          if (bookingTime > windowEnd && !nextBooking) {
+          // Track next future booking (starts after now + earlyStartMs)
+          if (bookingStart > now && !nextBooking) {
             nextBooking = booking;
           }
         }
 
-        this.upcomingBooking = upcomingBooking;
+        this.upcomingBooking = activeBooking;
         this.nextBooking = nextBooking;
 
-        if (upcomingBooking) {
+        if (activeBooking) {
           this.status = 'ready';
         } else {
           this.status = 'no-booking';
