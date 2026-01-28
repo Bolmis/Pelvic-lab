@@ -238,6 +238,7 @@ export default {
       upcomingBooking: null,
       nextBooking: null,
       refreshInterval: null,
+      countdownInterval: null,
       currentTime: new Date()
     };
   },
@@ -456,9 +457,13 @@ export default {
     // Check bookings immediately
     this.checkBookings();
 
-    // Refresh bookings and update countdown every 10 seconds
-    this.refreshInterval = setInterval(() => {
+    // Update countdown every second
+    this.countdownInterval = setInterval(() => {
       this.currentTime = new Date();
+    }, 1000);
+
+    // Refresh bookings every 10 seconds
+    this.refreshInterval = setInterval(() => {
       if (this.status !== 'started' && this.status !== 'error') {
         this.checkBookings();
       }
@@ -468,6 +473,9 @@ export default {
   beforeDestroy() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
+    }
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
     }
   }
 };
