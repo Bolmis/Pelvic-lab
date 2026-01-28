@@ -70,8 +70,27 @@ The backend (Replit) needs these environment variables:
 
     <!-- Main Card -->
     <div class="pxs-card">
+      <!-- No upcoming booking state -->
+      <template v-if="status === 'no-booking'">
+        <div class="pxs-card-icon pxs-waiting">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <h2 class="pxs-card-title">Ingen bokning just nu</h2>
+        <p class="pxs-card-text" v-if="nextBookingTime">
+          Din nästa bokning börjar <strong>{{ nextBookingTime }}</strong>.<br>
+          Kom tillbaka 5 minuter innan för att starta stolen.
+        </p>
+        <p class="pxs-card-text" v-else>
+          Du har ingen PelviX-bokning idag.<br>
+          Boka en tid för att kunna starta stolen.
+        </p>
+      </template>
+
       <!-- Ready to start state -->
-      <template v-if="status === 'ready'">
+      <template v-else-if="status === 'ready'">
         <div class="pxs-card-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="10"/>
@@ -79,7 +98,10 @@ The backend (Replit) needs these environment variables:
           </svg>
         </div>
         <h2 class="pxs-card-title">Redo att börja?</h2>
-        <p class="pxs-card-text">Tryck på knappen nedan för att låsa upp din PelviX-stol och påbörja din behandling.</p>
+        <p class="pxs-card-text">
+          Din bokning börjar <strong>{{ upcomingBookingTime }}</strong>.<br>
+          Tryck på knappen för att låsa upp stolen.
+        </p>
 
         <button
           class="pxs-start-button"
@@ -141,7 +163,7 @@ The backend (Replit) needs these environment variables:
         <h2 class="pxs-card-title">Något gick fel</h2>
         <p class="pxs-card-text pxs-error-text">{{ errorMessage }}</p>
 
-        <button class="pxs-start-button" @click="resetStatus">
+        <button class="pxs-start-button" @click="checkBookingsAndReset">
           <span class="pxs-btn-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"/>
@@ -195,15 +217,23 @@ export default {
       title: 'Backend API URL',
       type: String,
       default: 'https://298a9f30-5c19-44f4-8a22-7887a16908af-00-23a7i7oye5ln.picard.replit.dev'
+    },
+    bookingWindowMinutes: {
+      title: 'Minutes before booking to allow start',
+      type: Number,
+      default: 5
     }
   },
 
   data() {
     return {
-      loading: false,
+      loading: true,
       starting: false,
-      status: 'ready',
-      errorMessage: ''
+      status: 'no-booking',
+      errorMessage: '',
+      upcomingBooking: null,
+      nextBooking: null,
+      refreshInterval: null
     };
   },
 
@@ -226,10 +256,114 @@ export default {
         return `${user.firstName} ${user.lastName}`;
       }
       return user.name || user.firstName || user.email || '';
+    },
+
+    upcomingBookingTime() {
+      if (!this.upcomingBooking) return '';
+      const time = new Date(this.upcomingBooking.time.replace(' ', 'T'));
+      return time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    nextBookingTime() {
+      if (!this.nextBooking) return '';
+      const time = new Date(this.nextBooking.time.replace(' ', 'T'));
+      return 'kl. ' + time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    }
+  },
+
+  watch: {
+    '$store.state.user': {
+      immediate: true,
+      handler(user) {
+        if (user) {
+          this.checkBookings();
+        }
+      }
     }
   },
 
   methods: {
+    async checkBookings() {
+      if (!this.$store.state.user) {
+        this.loading = false;
+        return;
+      }
+
+      try {
+        const now = new Date();
+        const today = now.getFullYear() + '-' +
+                      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                      String(now.getDate()).padStart(2, '0');
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const tomorrowStr = tomorrow.getFullYear() + '-' +
+                            String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' +
+                            String(tomorrow.getDate()).padStart(2, '0');
+
+        const bookings = await this.$api.get('/api/memberapi/bookings/get', {
+          startTime: today,
+          endTime: tomorrowStr
+        });
+
+        console.log('PelviX: Checking bookings', bookings);
+
+        const windowMs = this.bookingWindowMinutes * 60 * 1000;
+        const windowEnd = new Date(now.getTime() + windowMs);
+
+        let upcomingBooking = null;
+        let nextBooking = null;
+        let allBookings = [];
+
+        // Collect all resource bookings
+        if (bookings && bookings.resourcebookings) {
+          bookings.resourcebookings.forEach(category => {
+            if (category.bookings) {
+              category.bookings.forEach(booking => {
+                if (!booking.cancelled) {
+                  const bookingTime = new Date(booking.time.replace(' ', 'T'));
+                  allBookings.push({ ...booking, parsedTime: bookingTime });
+                }
+              });
+            }
+          });
+        }
+
+        // Sort by time
+        allBookings.sort((a, b) => a.parsedTime - b.parsedTime);
+
+        // Find upcoming booking (within window) and next booking (future)
+        for (const booking of allBookings) {
+          const bookingTime = booking.parsedTime;
+
+          // Check if booking is within the start window (now <= bookingTime <= now + windowMs)
+          if (bookingTime >= now && bookingTime <= windowEnd) {
+            upcomingBooking = booking;
+            console.log('PelviX: Found booking within window', booking.time);
+            break;
+          }
+
+          // Track next future booking
+          if (bookingTime > windowEnd && !nextBooking) {
+            nextBooking = booking;
+          }
+        }
+
+        this.upcomingBooking = upcomingBooking;
+        this.nextBooking = nextBooking;
+
+        if (upcomingBooking) {
+          this.status = 'ready';
+        } else {
+          this.status = 'no-booking';
+        }
+
+      } catch (error) {
+        console.error('PelviX: Error checking bookings', error);
+        this.status = 'no-booking';
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async startPelvix() {
       if (!this.userId) {
         this.status = 'error';
@@ -270,9 +404,32 @@ export default {
       }
     },
 
+    checkBookingsAndReset() {
+      this.errorMessage = '';
+      this.checkBookings();
+    },
+
     resetStatus() {
       this.status = 'ready';
       this.errorMessage = '';
+    }
+  },
+
+  mounted() {
+    // Check bookings immediately
+    this.checkBookings();
+
+    // Refresh every 30 seconds
+    this.refreshInterval = setInterval(() => {
+      if (this.status !== 'started' && this.status !== 'error') {
+        this.checkBookings();
+      }
+    }, 30000);
+  },
+
+  beforeDestroy() {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
     }
   }
 };
@@ -437,6 +594,10 @@ export default {
 
 .zoezi-pelvix-starter .pxs-card-icon.pxs-error {
   background: linear-gradient(135deg, #E57373 0%, var(--pxs-error) 100%);
+}
+
+.zoezi-pelvix-starter .pxs-card-icon.pxs-waiting {
+  background: linear-gradient(135deg, var(--pxs-gray-300) 0%, var(--pxs-gray-500) 100%);
 }
 
 .zoezi-pelvix-starter .pxs-card-title {
