@@ -223,7 +223,7 @@ async function unlockDevice(patientId, patientName, transactionId, remainingUnit
     transactionId: transactionId
   };
 
-  const unlockUrl = `${config.baseUrl}/api/command/unlock`;
+  const unlockUrl = `${config.baseUrl}/command/unlock`;
   console.log(`[Pelvipower] Unlocking device for patient: ${patientName} (${patientId})`);
   console.log(`[Pelvipower] URL: ${unlockUrl}`);
 
