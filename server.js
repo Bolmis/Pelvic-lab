@@ -223,9 +223,11 @@ async function unlockDevice(patientId, patientName, transactionId, remainingUnit
     transactionId: transactionId
   };
 
+  const unlockUrl = `${config.baseUrl}/api/command/unlock`;
   console.log(`[Pelvipower] Unlocking device for patient: ${patientName} (${patientId})`);
+  console.log(`[Pelvipower] URL: ${unlockUrl}`);
 
-  const response = await fetch(`${config.baseUrl}/command/unlock`, {
+  const response = await fetch(unlockUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
