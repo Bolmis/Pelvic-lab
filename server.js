@@ -141,7 +141,7 @@ app.use((req, res, next) => {
 // =============================================================================
 
 // Environment: 'development' or 'production'
-const PELVIC_ENV = process.env.PELVIC_ENV || 'development';
+const PELVIC_ENV = process.env.PELVIC_ENV || 'production';
 
 const PELVIC_CONFIG = {
   development: {
