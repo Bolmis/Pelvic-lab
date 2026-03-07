@@ -226,6 +226,10 @@ const DEVICE_SERIAL_NUMBER = process.env.PELVIC_DEVICE_SERIAL_NUMBER;
 let cachedToken = null;
 let tokenExpiry = null;
 
+// Active session tracking for auto-lock
+// Key: transactionId, Value: { timer, bookingEnd, patientName, patientId, status }
+const activeSessions = new Map();
+
 // =============================================================================
 // Pelvipower API Functions
 // =============================================================================
@@ -305,6 +309,158 @@ async function unlockDevice(patientId, patientName, transactionId, remainingUnit
   console.log(`[Pelvipower] Device unlocked successfully for ${patientName}`);
   return { success: true };
 }
+
+async function abortDevice(reason) {
+  if (!DEVICE_SERIAL_NUMBER) {
+    throw new Error('Missing device serial number. Set PELVIC_DEVICE_SERIAL_NUMBER in Replit Secrets.');
+  }
+
+  const token = await getAccessToken();
+
+  const payload = {
+    deviceSerialNumber: DEVICE_SERIAL_NUMBER,
+    graphicBase64: ""
+  };
+
+  const abortUrl = `${config.baseUrl}/command/abort`;
+  console.log(`[Pelvipower] Aborting/locking device (reason: ${reason})`);
+
+  const response = await fetch(abortUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to abort device: ${response.status} - ${errorText}`);
+  }
+
+  console.log(`[Pelvipower] Device locked successfully (reason: ${reason})`);
+  return { success: true };
+}
+
+async function abortDeviceWithRetry(reason, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await abortDevice(reason);
+    } catch (error) {
+      console.error(`[Pelvipower] Abort attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+      if (attempt < maxRetries) {
+        const delay = attempt * 2000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error(`[Pelvipower] All abort attempts failed for: ${reason}`);
+        await sendNotificationEmail(
+          '🚨 PelviX Auto-Lock MISSLYCKADES',
+          `
+          <h2 style="color: #e74c3c;">Kunde inte låsa stolen!</h2>
+          <p><strong>Tid:</strong> ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}</p>
+          <p><strong>Anledning:</strong> ${reason}</p>
+          <p><strong>Fel:</strong> ${error.message}</p>
+          <hr>
+          <p style="color: #e74c3c; font-weight: bold;">Stolen kan fortfarande vara upplåst. Kontrollera manuellt!</p>
+          `
+        );
+        throw error;
+      }
+    }
+  }
+}
+
+function scheduleSessionAbort(transactionId, bookingEnd, patientName, patientId) {
+  // Guard: don't create duplicate timers for same transaction
+  if (activeSessions.has(transactionId)) {
+    const existing = activeSessions.get(transactionId);
+    if (existing.status === 'active') {
+      console.log(`[AutoLock] Session ${transactionId} already tracked, skipping duplicate`);
+      return;
+    }
+  }
+
+  const nowStockholm = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Stockholm' }));
+  const delayMs = bookingEnd.getTime() - nowStockholm.getTime();
+
+  console.log(`[AutoLock] Scheduling abort for ${transactionId} in ${Math.round(delayMs / 1000)}s (booking ends ${bookingEnd.toLocaleString('sv-SE')})`);
+
+  const timer = setTimeout(async () => {
+    const session = activeSessions.get(transactionId);
+    if (!session || session.status !== 'active') {
+      console.log(`[AutoLock] Session ${transactionId} already ended, skipping abort`);
+      return;
+    }
+
+    session.status = 'aborting';
+    console.log(`[AutoLock] Booking time expired for ${patientName} (${transactionId}), locking device`);
+
+    try {
+      await abortDeviceWithRetry(`Bokningstid slut för ${patientName} (${transactionId})`);
+      session.status = 'aborted';
+
+      await sendNotificationEmail(
+        `🔒 PelviX Auto-Låst - ${patientName}`,
+        `
+        <h2 style="color: #3498db;">PelviX Automatiskt Låst</h2>
+        <p><strong>Tid:</strong> ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}</p>
+        <p><strong>Användare:</strong> ${patientName}</p>
+        <p><strong>Användar-ID:</strong> ${patientId}</p>
+        <p><strong>Transaktion:</strong> ${transactionId}</p>
+        <p><strong>Anledning:</strong> Bokningstiden har gått ut</p>
+        `
+      );
+    } catch (error) {
+      console.error(`[AutoLock] Failed to abort session ${transactionId}:`, error.message);
+    }
+
+    activeSessions.delete(transactionId);
+  }, Math.max(delayMs, 0));
+
+  activeSessions.set(transactionId, {
+    timer,
+    bookingEnd,
+    patientName,
+    patientId,
+    status: 'active'
+  });
+}
+
+function clearSession(transactionId, reason) {
+  const session = activeSessions.get(transactionId);
+  if (!session) return;
+
+  if (session.status === 'active') {
+    clearTimeout(session.timer);
+    console.log(`[AutoLock] Cleared timer for ${transactionId} (${reason})`);
+  }
+
+  activeSessions.delete(transactionId);
+}
+
+// Safety sweep: check for expired sessions every 30 seconds
+setInterval(async () => {
+  const nowStockholm = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Stockholm' }));
+
+  for (const [txnId, session] of activeSessions) {
+    if (session.status !== 'active') continue;
+    if (nowStockholm > session.bookingEnd) {
+      console.log(`[AutoLock Sweep] Found expired session ${txnId}, forcing abort`);
+      session.status = 'aborting';
+      clearTimeout(session.timer);
+
+      try {
+        await abortDeviceWithRetry(`Sweep: bokningstid passerad för ${session.patientName}`);
+        session.status = 'aborted';
+      } catch (error) {
+        console.error(`[AutoLock Sweep] Failed to abort ${txnId}:`, error.message);
+      }
+
+      activeSessions.delete(txnId);
+    }
+  }
+}, 30000);
 
 // =============================================================================
 // API Endpoints
@@ -397,9 +553,21 @@ app.post('/api/start-pelvix', async (req, res) => {
     console.log(`[PelviX] Booking verified, unlocking device for ${patientName}`);
     await unlockDevice(patientId, patientName, txnId);
 
-    // Step 3: Send success email
+    // Step 3: Schedule auto-lock when booking ends
     const bookingTime = booking ? booking.time : 'Unknown';
     const bookingDuration = booking ? (booking.duration || 60) : 60;
+
+    if (booking) {
+      const [datePart, timePart] = booking.time.split(' ');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hour, minute, second] = timePart.split(':').map(Number);
+      const bookingStart = new Date(year, month - 1, day, hour, minute, second || 0);
+      const bookingEnd = new Date(bookingStart.getTime() + bookingDuration * 60 * 1000);
+
+      scheduleSessionAbort(txnId, bookingEnd, patientName, patientId);
+    }
+
+    // Step 4: Send success email
 
     await sendNotificationEmail(
       `✅ PelviX Startad - ${patientName}`,
@@ -527,10 +695,22 @@ app.post('/api/webhook/fillout-halsodeklaration', async (req, res) => {
 
 // Webhook endpoint for Pelvipower events
 app.post('/api/webhook/pelvic', (req, res) => {
-  console.log('[Pelvipower Webhook] Received event:', JSON.stringify(req.body, null, 2));
+  const payload = req.body;
+  const transactionId = payload.transactionId;
+  const entries = payload.entries || [];
 
-  // Process webhook events here
-  // Events include: Treatment_Start, Treatment_Stop, Treatment_Pause, etc.
+  console.log(`[Pelvipower Webhook] Received ${entries.length} event(s) for transaction: ${transactionId}`);
+
+  for (const entry of entries) {
+    console.log(`[Pelvipower Webhook] Event: ${entry.event} at ${entry.createdAt}`);
+
+    if (entry.event === 'Treatment_Stop' || entry.event === 'Treatment_ReturnToLockScreen') {
+      if (transactionId && activeSessions.has(transactionId)) {
+        clearSession(transactionId, `device event: ${entry.event}`);
+        console.log(`[Pelvipower Webhook] Session ${transactionId} ended naturally (${entry.event})`);
+      }
+    }
+  }
 
   res.sendStatus(200);
 });
@@ -758,9 +938,19 @@ docs.forEach(doc => {
     });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Pelvic Lab server running at http://0.0.0.0:${PORT}`);
     console.log(`  - Documentation: http://0.0.0.0:${PORT}/`);
     console.log(`  - API Health: http://0.0.0.0:${PORT}/api/health`);
     console.log(`  - Environment: ${PELVIC_ENV}`);
+
+    // Safety: lock device on startup to ensure clean state after restart
+    if (CLIENT_ID && CLIENT_SECRET && DEVICE_SERIAL_NUMBER) {
+      try {
+        await abortDevice('Server startup safety lock');
+        console.log('[Startup] Device locked as safety precaution');
+      } catch (error) {
+        console.error('[Startup] Could not lock device on startup:', error.message);
+      }
+    }
 });
