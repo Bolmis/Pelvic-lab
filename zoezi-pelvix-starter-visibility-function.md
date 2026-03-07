@@ -8,7 +8,11 @@
 
 ## Overview
 
-The booking check logic is now built into the component itself, so the visibility function only needs to check if the user is logged in.
+The PelviX Starter component requires the user to have completed the Hälsodeklaration (health declaration form) before it becomes visible. The booking check logic is built into the component itself.
+
+The visibility function checks:
+1. User is logged in
+2. User has completed the hälsodeklaration (`xf.halsodeklaration === true`)
 
 The component handles these states internally:
 - **Loading** - While fetching bookings
@@ -19,9 +23,9 @@ The component handles these states internally:
 
 ---
 
-## Visibility Function (Simple)
+## Visibility Function (Recommended)
 
-Use this if you want to show the component only for logged-in users:
+Use this to show the component only for logged-in users who have completed the hälsodeklaration:
 
 ```javascript
 try {
@@ -29,23 +33,36 @@ try {
   if (!window.$store || !window.$store.state || !window.$store.state.user) {
     return false;
   }
+  // Only show if hälsodeklaration is completed
+  var user = window.$store.state.user;
+  if (!user.xf || user.xf.halsodeklaration !== true) {
+    return false;
+  }
   return true;
 } catch (error) {
-  console.error('Visibility check error:', error);
+  console.error('PelviX visibility check error:', error);
   return false;
 }
 ```
 
 ---
 
-## Alternative: No Visibility Function
+## Server-Side Enforcement
 
-You can also skip the visibility function entirely. The component will:
-1. Show a login prompt for non-authenticated users
-2. Show the appropriate state (no booking / ready / etc.) for authenticated users
+In addition to the visibility function (which is UX-only), the server also enforces the hälsodeklaration check. If a user somehow accesses the PelviX Starter without completing the form, the `POST /api/start-pelvix` endpoint will return a 403 error with the message:
 
-This is the recommended approach since the component handles all states gracefully.
+> "Du måste fylla i hälsodeklarationen innan du kan starta PelviX."
 
 ---
 
-*Last updated: 2026-01-28*
+## Page Layout
+
+On the PelviX page, place both components:
+1. **Hälsodeklaration** (visible when `xf.halsodeklaration !== true`) - shows the form
+2. **PelviX Starter** (visible when `xf.halsodeklaration === true`) - shows the device control
+
+Only one will be visible at a time based on the user's hälsodeklaration status.
+
+---
+
+*Last updated: 2026-03-07*

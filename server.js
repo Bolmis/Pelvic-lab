@@ -46,6 +46,7 @@ async function sendNotificationEmail(subject, htmlContent) {
 
 const ZOEZI_API_KEY = process.env.ZOEZI_API_KEY;
 const ZOEZI_DOMAIN = 'pelviclab.zoezi.se';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
 async function verifyActiveResourceBooking(userId) {
   if (!ZOEZI_API_KEY) {
@@ -119,6 +120,66 @@ async function verifyActiveResourceBooking(userId) {
 
   console.log(`[Zoezi] No active booking found for user ${userId}`);
   return { hasActiveBooking: false, booking: null };
+}
+
+// =============================================================================
+// Zoezi User XF Functions
+// =============================================================================
+
+async function getZoeziUser(userId) {
+  const url = `https://${ZOEZI_DOMAIN}/api/user/get/${userId}`;
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': ZOEZI_API_KEY
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Zoezi API error getting user ${userId}: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
+}
+
+async function updateUserXf(userId, fieldName, value) {
+  console.log(`[Zoezi] Updating user ${userId} xf.${fieldName} = ${value}`);
+
+  // Get current user to merge xf fields
+  const user = await getZoeziUser(userId);
+
+  const updatedXf = {
+    ...(user.xf || {}),
+    [fieldName]: value
+  };
+
+  const url = `https://${ZOEZI_DOMAIN}/api/user/change`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/plain, */*',
+      'Authorization': ZOEZI_API_KEY
+    },
+    body: JSON.stringify({
+      id: userId,
+      xf: updatedXf
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Zoezi API error updating xf for user ${userId}: ${response.status} - ${errorText}`);
+  }
+
+  console.log(`[Zoezi] Successfully updated user ${userId} xf.${fieldName} = ${value}`);
+  return response.json();
+}
+
+async function checkHalsodeklaration(userId) {
+  const user = await getZoeziUser(userId);
+  return user.xf && user.xf.halsodeklaration === true;
 }
 
 // Middleware
@@ -275,6 +336,18 @@ app.post('/api/start-pelvix', async (req, res) => {
 
     const txnId = transactionId || `session-${patientId}-${Date.now()}`;
 
+    // Step 0: Verify hälsodeklaration is completed
+    console.log(`[PelviX] Checking hälsodeklaration for user ${patientId}`);
+    const hasHalsodeklaration = await checkHalsodeklaration(patientId);
+
+    if (!hasHalsodeklaration) {
+      console.log(`[PelviX] Hälsodeklaration not completed for ${patientName} (${patientId})`);
+      return res.status(403).json({
+        success: false,
+        error: 'Du måste fylla i hälsodeklarationen innan du kan starta PelviX.'
+      });
+    }
+
     // Step 1: Verify active resourcebooking via Zoezi API
     console.log(`[PelviX] Verifying booking for user ${patientId} (${patientName})`);
     const { hasActiveBooking, booking } = await verifyActiveResourceBooking(patientId);
@@ -357,6 +430,81 @@ app.post('/api/start-pelvix', async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// Webhook endpoint for Fillout hälsodeklaration form submission
+app.post('/api/webhook/fillout-halsodeklaration', async (req, res) => {
+  console.log('[Fillout Webhook] Received hälsodeklaration submission');
+
+  // Verify webhook secret
+  const secret = req.query.secret;
+  if (!WEBHOOK_SECRET || secret !== WEBHOOK_SECRET) {
+    console.error('[Fillout Webhook] Invalid or missing webhook secret');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Extract ref (Zoezi user ID) from Fillout submission
+    // Fillout sends submissions with urlParameters containing the ref
+    const submission = req.body;
+    let userId = null;
+
+    // Check urlParameters for ref
+    if (submission.urlParameters && submission.urlParameters.ref) {
+      userId = submission.urlParameters.ref;
+    }
+
+    // Also check submission parameters array
+    if (!userId && submission.submission && submission.submission.urlParameters) {
+      userId = submission.submission.urlParameters.ref;
+    }
+
+    // Fallback: check top-level ref
+    if (!userId && submission.ref) {
+      userId = submission.ref;
+    }
+
+    if (!userId) {
+      console.error('[Fillout Webhook] No user ID (ref) found in submission. Keys present:', Object.keys(submission));
+      return res.status(400).json({ error: 'Missing user ID (ref) in submission' });
+    }
+
+    userId = parseInt(userId, 10);
+    if (isNaN(userId)) {
+      console.error('[Fillout Webhook] Invalid user ID:', userId);
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    // Check if already set (idempotent)
+    const alreadySet = await checkHalsodeklaration(userId);
+    if (alreadySet) {
+      console.log(`[Fillout Webhook] User ${userId} already has halsodeklaration=true, skipping`);
+      return res.json({ success: true, message: 'Already completed' });
+    }
+
+    // Update user's xf.halsodeklaration field in Zoezi
+    await updateUserXf(userId, 'halsodeklaration', true);
+
+    console.log(`[Fillout Webhook] Successfully set halsodeklaration=true for user ${userId}`);
+
+    // Send notification email
+    await sendNotificationEmail(
+      `Hälsodeklaration ifylld - Användare ${userId}`,
+      `
+      <h2 style="color: #27ae60;">Hälsodeklaration Registrerad</h2>
+      <p><strong>Tid:</strong> ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}</p>
+      <p><strong>Användar-ID:</strong> ${userId}</p>
+      <hr>
+      <p style="color: #7f8c8d; font-size: 12px;">Användaren har fyllt i sin hälsodeklaration och kan nu använda PelviX.</p>
+      `
+    );
+
+    res.json({ success: true, message: 'Hälsodeklaration registered' });
+
+  } catch (error) {
+    console.error('[Fillout Webhook] Error processing submission:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -565,7 +713,8 @@ const docs = [
     { file: 'pelviclab-booking-component.md', title: 'Booking Component', slug: 'booking' },
     { file: 'pelviclab-webshop-component.md', title: 'Webshop Component', slug: 'webshop' },
     { file: 'pelvic-api-docs.md', title: 'API Documentation', slug: 'api' },
-    { file: 'zoezi-pelvix-starter-COMPLETE.md', title: 'PelviX Starter Component', slug: 'pelvix-starter' }
+    { file: 'zoezi-pelvix-starter-COMPLETE.md', title: 'PelviX Starter Component', slug: 'pelvix-starter' },
+    { file: 'zoezi-halsodeklaration-COMPLETE.md', title: 'Hälsodeklaration Component', slug: 'halsodeklaration' }
 ];
 
 const generateSidebar = (activeSlug) => {
