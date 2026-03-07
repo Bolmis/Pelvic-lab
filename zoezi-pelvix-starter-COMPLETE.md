@@ -77,7 +77,7 @@ The backend (Replit) needs these environment variables:
         Köp ett klippkort eller medlemskap, eller boka en tid.
       </p>
 
-      <a href="/shoppa" class="pxs-start-button" style="display: flex; text-decoration: none;">
+      <a href="/shoppa" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
         <span class="pxs-btn-content">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
