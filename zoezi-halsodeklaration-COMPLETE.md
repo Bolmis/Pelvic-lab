@@ -247,7 +247,9 @@ export default {
               category.bookings.forEach(function(booking) {
                 if (!booking.cancelled) {
                   var bookingStart = new Date(booking.time.replace(' ', 'T'));
-                  if (bookingStart >= now) {
+                  var duration = booking.duration || 60;
+                  var bookingEnd = new Date(bookingStart.getTime() + duration * 60 * 1000);
+                  if (bookingEnd >= now) {
                     hasAny = true;
                   }
                 }

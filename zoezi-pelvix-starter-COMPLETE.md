@@ -455,7 +455,7 @@ export default {
 
         this.upcomingBooking = activeBooking;
         this.nextBooking = nextBooking;
-        this.hasFutureBooking = allBookings.some(function(b) { return b.parsedStart >= now; });
+        this.hasFutureBooking = allBookings.some(function(b) { return b.parsedEnd >= now; });
 
         if (activeBooking) {
           this.status = 'ready';

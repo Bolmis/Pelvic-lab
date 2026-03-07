@@ -230,6 +230,9 @@ let tokenExpiry = null;
 // Key: transactionId, Value: { timer, bookingEnd, patientName, patientId, status }
 const activeSessions = new Map();
 
+// Guard against duplicate start requests per user
+const startInFlight = new Set();
+
 // =============================================================================
 // Pelvipower API Functions
 // =============================================================================
@@ -548,7 +551,7 @@ app.post('/api/start-pelvix', async (req, res) => {
   let patientId, patientName, transactionId;
 
   try {
-    ({ patientId, patientName, transactionId } = req.body);
+    ({ patientId, patientName } = req.body);
 
     if (!patientId || !patientName) {
       return res.status(400).json({
@@ -557,7 +560,16 @@ app.post('/api/start-pelvix', async (req, res) => {
       });
     }
 
-    const txnId = transactionId || `session-${patientId}-${Date.now()}`;
+    // Guard against duplicate start requests for same user
+    if (startInFlight.has(String(patientId))) {
+      return res.status(429).json({
+        success: false,
+        error: 'En startförfrågan pågår redan. Vänta en stund.'
+      });
+    }
+    startInFlight.add(String(patientId));
+
+    const txnId = `session-${patientId}-${Date.now()}`;
 
     // Step 0: Verify hälsodeklaration is completed
     console.log(`[PelviX] Checking hälsodeklaration for user ${patientId}`);
@@ -565,6 +577,7 @@ app.post('/api/start-pelvix', async (req, res) => {
 
     if (!hasHalsodeklaration) {
       console.log(`[PelviX] Hälsodeklaration not completed for ${patientName} (${patientId})`);
+      startInFlight.delete(String(patientId));
       return res.status(403).json({
         success: false,
         error: 'Du måste fylla i hälsodeklarationen innan du kan starta PelviX.'
@@ -593,6 +606,7 @@ app.post('/api/start-pelvix', async (req, res) => {
         `
       );
 
+      startInFlight.delete(String(patientId));
       return res.status(403).json({
         success: false,
         error: errorMsg
@@ -636,6 +650,8 @@ app.post('/api/start-pelvix', async (req, res) => {
       `
     );
 
+    startInFlight.delete(String(patientId));
+
     res.json({
       success: true,
       message: 'Device unlocked successfully',
@@ -643,6 +659,7 @@ app.post('/api/start-pelvix', async (req, res) => {
     });
 
   } catch (error) {
+    startInFlight.delete(String(patientId));
     console.error('[PelviX] Error:', error.message);
 
     // Send error email
