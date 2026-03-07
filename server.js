@@ -453,7 +453,6 @@ app.post('/api/start-pelvix', async (req, res) => {
 // Webhook endpoint for Fillout hälsodeklaration form submission
 app.post('/api/webhook/fillout-halsodeklaration', async (req, res) => {
   console.log('[Fillout Webhook] Received hälsodeklaration submission');
-  console.log('[Fillout Webhook] Full payload:', JSON.stringify(req.body, null, 2));
 
   // Verify webhook secret
   const secret = req.query.secret;

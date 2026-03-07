@@ -384,64 +384,78 @@ export default {
     icon: 'mdi-shopping'
   },
 
+  props: {
+    klippkortProductId: {
+      title: 'Klippkort - Zoezi Product ID',
+      type: Number,
+      default: 0
+    },
+    klippkortName: {
+      title: 'Klippkort - Name',
+      type: String,
+      default: 'PelviX Klippkort'
+    },
+    klippkortSubtitle: {
+      title: 'Klippkort - Subtitle',
+      type: String,
+      default: '10 behandlingar'
+    },
+    klippkortPrice: {
+      title: 'Klippkort - Price (kr)',
+      type: Number,
+      default: 4995
+    },
+    klippkortOriginalPrice: {
+      title: 'Klippkort - Original Price (0 = hidden)',
+      type: Number,
+      default: 7995
+    },
+    membershipProductId: {
+      title: '6 Månader - Zoezi Product ID',
+      type: Number,
+      default: 0
+    },
+    membershipName: {
+      title: '6 Månader - Name',
+      type: String,
+      default: 'PelviX 6 Månader'
+    },
+    membershipSubtitle: {
+      title: '6 Månader - Subtitle',
+      type: String,
+      default: 'Obegränsade behandlingar'
+    },
+    membershipPrice: {
+      title: '6 Månader - Price (kr/mån)',
+      type: Number,
+      default: 995
+    },
+    vipProductId: {
+      title: 'VIP Gold - Zoezi Product ID',
+      type: Number,
+      default: 0
+    },
+    vipName: {
+      title: 'VIP Gold - Name',
+      type: String,
+      default: 'PelviX VIP Gold'
+    },
+    vipSubtitle: {
+      title: 'VIP Gold - Subtitle',
+      type: String,
+      default: 'Premium medlemskap'
+    },
+    vipPrice: {
+      title: 'VIP Gold - Price (kr/mån)',
+      type: Number,
+      default: 1495
+    }
+  },
+
   data() {
     return {
       siteId: 1,
       checkoutLoading: false,
-
-      // Products - UPDATE PRODUCT IDs WITH ACTUAL VALUES FROM ZOEZI
-      products: [
-        {
-          id: 1, // UPDATE THIS
-          name: "PelviX Klippkort",
-          subtitle: "10 behandlingar",
-          price: 4995,
-          originalPrice: 7995,
-          type: "klippkort",
-          productType: "trainingcard", // Zoezi product type
-          features: [
-            "10 PelviX-behandlingar",
-            "Giltigt i 12 månader",
-            "Boka när det passar dig",
-            "Spara 3 000 kr"
-          ],
-          badge: "Populärast"
-        },
-        {
-          id: 2, // UPDATE THIS
-          name: "PelviX 6 Månader",
-          subtitle: "Obegränsade behandlingar",
-          price: 995,
-          priceType: "month",
-          type: "membership",
-          productType: "trainingcard",
-          features: [
-            "Obegränsade behandlingar",
-            "6 månaders bindningstid",
-            "Prioriterad bokning",
-            "Personlig uppföljning"
-          ],
-          badge: null
-        },
-        {
-          id: 3, // UPDATE THIS
-          name: "PelviX VIP Gold",
-          subtitle: "Premium medlemskap",
-          price: 1495,
-          priceType: "month",
-          type: "membership",
-          productType: "trainingcard",
-          features: [
-            "Obegränsade behandlingar",
-            "Ingen bindningstid",
-            "VIP-tider & prioriterad bokning",
-            "Gratis extrabehandlingar",
-            "Personlig coach"
-          ],
-          badge: "VIP",
-          highlighted: true
-        }
-      ],
 
       // Selection
       selectedProduct: null,
@@ -458,6 +472,61 @@ export default {
   },
 
   computed: {
+    products() {
+      return [
+        {
+          id: this.klippkortProductId,
+          name: this.klippkortName,
+          subtitle: this.klippkortSubtitle,
+          price: this.klippkortPrice,
+          originalPrice: this.klippkortOriginalPrice || null,
+          type: "klippkort",
+          productType: "trainingcard",
+          features: [
+            "10 PelviX-behandlingar",
+            "Giltigt i 12 månader",
+            "Boka när det passar dig",
+            this.klippkortOriginalPrice ? "Spara " + (this.klippkortOriginalPrice - this.klippkortPrice).toLocaleString('sv-SE') + " kr" : null
+          ].filter(Boolean),
+          badge: "Populärast"
+        },
+        {
+          id: this.membershipProductId,
+          name: this.membershipName,
+          subtitle: this.membershipSubtitle,
+          price: this.membershipPrice,
+          priceType: "month",
+          type: "membership",
+          productType: "trainingcard",
+          features: [
+            "Obegränsade behandlingar",
+            "6 månaders bindningstid",
+            "Prioriterad bokning",
+            "Personlig uppföljning"
+          ],
+          badge: null
+        },
+        {
+          id: this.vipProductId,
+          name: this.vipName,
+          subtitle: this.vipSubtitle,
+          price: this.vipPrice,
+          priceType: "month",
+          type: "membership",
+          productType: "trainingcard",
+          features: [
+            "Obegränsade behandlingar",
+            "Ingen bindningstid",
+            "VIP-tider & prioriterad bokning",
+            "Gratis extrabehandlingar",
+            "Personlig coach"
+          ],
+          badge: "VIP",
+          highlighted: true
+        }
+      ];
+    },
+
     isUserLoggedIn() {
       return !!(window.$store &&
                 window.$store.state &&
@@ -1358,24 +1427,22 @@ The component uses the built-in `<zoezi-checkout>` component which handles:
 
 ## Configuration Notes
 
-### Update Product IDs
+### Product IDs & Pricing (Page Builder Settings)
 
-Before deploying, update the product IDs in the `products` array with the actual IDs from your Zoezi setup:
+All product IDs, names, subtitles, and prices are configurable as **component props** in the Zoezi page builder. No code changes needed — just set the values in the component settings:
 
-```javascript
-products: [
-  { id: YOUR_KLIPPKORT_ID, ... },
-  { id: YOUR_6MONTH_ID, ... },
-  { id: YOUR_VIP_GOLD_ID, ... }
-]
-```
-
-### Pricing
-
-Update the prices if they differ from the configured values:
-- Klippkort: 4 995 kr (was 7 995 kr)
-- 6 Månader: 995 kr/mån
-- VIP Gold: 1 495 kr/mån
+| Setting | Default |
+|---------|---------|
+| Klippkort - Zoezi Product ID | 0 (must be set) |
+| Klippkort - Name | PelviX Klippkort |
+| Klippkort - Price | 4995 |
+| Klippkort - Original Price | 7995 (0 = hidden) |
+| 6 Månader - Zoezi Product ID | 0 (must be set) |
+| 6 Månader - Name | PelviX 6 Månader |
+| 6 Månader - Price | 995 kr/mån |
+| VIP Gold - Zoezi Product ID | 0 (must be set) |
+| VIP Gold - Name | PelviX VIP Gold |
+| VIP Gold - Price | 1495 kr/mån |
 
 ---
 
@@ -1391,4 +1458,4 @@ This webshop component provides a premium e-commerce experience for Pelvic Lab's
 
 ---
 
-*Last updated: 2026-01-22*
+*Last updated: 2026-03-07*
