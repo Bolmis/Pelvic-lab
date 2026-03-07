@@ -39,20 +39,22 @@ The backend (Replit) receives a webhook from Fillout when the form is submitted 
 
 ## Visibility Function
 
-Use this in the Zoezi page builder visibility settings to only show for logged-in users who have NOT completed the health declaration:
+The component handles its own visibility internally by calling the server endpoint
+`GET /api/check-halsodeklaration?userId=X` to check the `xf.halsodeklaration` field
+(since `/api/memberapi/get/current` does not include extra fields).
+
+No page builder visibility function is needed - the component renders empty when
+the user has already completed the form.
+
+Optionally, you can add a simple login check in the page builder:
 
 ```javascript
 try {
   if (!window.$store || !window.$store.state || !window.$store.state.user) {
     return false;
   }
-  var user = window.$store.state.user;
-  if (user.xf && user.xf.halsodeklaration === true) {
-    return false;
-  }
   return true;
 } catch (error) {
-  console.error('Halsodeklaration visibility error:', error);
   return false;
 }
 ```
@@ -63,23 +65,19 @@ try {
 
 ```html
 <div class="zoezi-halsodeklaration">
+  <!-- Loading state -->
+  <div v-if="loading" class="hd-loading-state">
+    <div class="hd-spinner"></div>
+    <span>Kontrollerar status...</span>
+  </div>
+
   <!-- Auth check - require login -->
-  <template v-if="!$store.state.user">
+  <template v-else-if="!$store.state.user">
     <zoezi-identification :title="$translate('Logga in för att fylla i din hälsodeklaration')" />
   </template>
 
-  <!-- Already completed -->
+  <!-- Already completed - hide completely (PelviX Starter will show instead) -->
   <template v-else-if="hasCompleted">
-    <div class="hd-completed">
-      <div class="hd-completed-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <h2>Hälsodeklaration ifylld</h2>
-      <p>Du har redan fyllt i din hälsodeklaration. Du kan nu använda PelviX.</p>
-    </div>
   </template>
 
   <!-- Form embed -->
@@ -132,6 +130,11 @@ export default {
   },
 
   props: {
+    apiUrl: {
+      title: 'Backend API URL',
+      type: String,
+      default: 'https://298a9f30-5c19-44f4-8a22-7887a16908af-00-23a7i7oye5ln.picard.replit.dev'
+    },
     filloutId: {
       title: 'Fillout Form ID',
       type: String,
@@ -151,7 +154,9 @@ export default {
 
   data() {
     return {
-      currentUserId: null
+      loading: true,
+      currentUserId: null,
+      hasCompleted: false
     };
   },
 
@@ -161,11 +166,6 @@ export default {
         width: '100%',
         height: this.height + 'px'
       };
-    },
-
-    hasCompleted() {
-      var user = this.$store.state.user;
-      return user && user.xf && user.xf.halsodeklaration === true;
     }
   },
 
@@ -175,16 +175,15 @@ export default {
       handler(user) {
         if (user) {
           this.fetchCurrentUser();
+        } else {
+          this.loading = false;
         }
       }
     },
 
     currentUserId(newVal) {
-      if (newVal && !this.hasCompleted) {
-        console.log('Halsodeklaration - User ID set, loading Fillout script');
-        this.$nextTick(() => {
-          this.loadFilloutScript();
-        });
+      if (newVal) {
+        this.checkHalsodeklaration();
       }
     }
   },
@@ -197,6 +196,30 @@ export default {
         console.log('Halsodeklaration - User ID fetched:', this.currentUserId);
       } catch (error) {
         console.error('Halsodeklaration - Error fetching user:', error);
+        this.loading = false;
+      }
+    },
+
+    async checkHalsodeklaration() {
+      try {
+        var response = await fetch(this.apiUrl + '/api/check-halsodeklaration?userId=' + this.currentUserId);
+        var data = await response.json();
+        this.hasCompleted = data.completed === true;
+        console.log('Halsodeklaration - Status:', this.hasCompleted);
+
+        if (!this.hasCompleted) {
+          this.$nextTick(() => {
+            this.loadFilloutScript();
+          });
+        }
+      } catch (error) {
+        console.error('Halsodeklaration - Error checking status:', error);
+        this.hasCompleted = false;
+        this.$nextTick(() => {
+          this.loadFilloutScript();
+        });
+      } finally {
+        this.loading = false;
       }
     },
 
@@ -336,7 +359,19 @@ export default {
   width: 100%;
 }
 
-/* Loading State */
+/* Loading State (initial check) */
+.zoezi-halsodeklaration .hd-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  color: var(--hd-gray-600);
+  font-size: 14px;
+  gap: 16px;
+}
+
+/* Loading State (form) */
 .zoezi-halsodeklaration .hd-loading {
   display: flex;
   flex-direction: column;

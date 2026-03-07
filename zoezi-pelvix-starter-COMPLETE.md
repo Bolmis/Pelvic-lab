@@ -56,6 +56,19 @@ The backend (Replit) needs these environment variables:
     <zoezi-identification :title="$translate('Logga in för att starta din PelviX-behandling')" />
   </template>
 
+  <!-- Hälsodeklaration not completed -->
+  <template v-else-if="!halsodeklarationCompleted">
+    <div class="pxs-card" style="text-align: center; padding: 48px 24px;">
+      <div class="pxs-card-icon pxs-waiting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+        </svg>
+      </div>
+      <h2 class="pxs-card-title">Hälsodeklaration krävs</h2>
+      <p class="pxs-card-text">Du måste fylla i hälsodeklarationen innan du kan starta PelviX. Scrolla upp för att fylla i formuläret.</p>
+    </div>
+  </template>
+
   <!-- Main content - logged in user -->
   <template v-else>
     <!-- Hero Section -->
@@ -233,6 +246,7 @@ export default {
     return {
       loading: true,
       starting: false,
+      halsodeklarationCompleted: false,
       status: 'no-booking',
       errorMessage: '',
       upcomingBooking: null,
@@ -306,13 +320,36 @@ export default {
       immediate: true,
       handler(user) {
         if (user) {
-          this.checkBookings();
+          this.checkHalsodeklarationAndBookings();
         }
       }
     }
   },
 
   methods: {
+    async checkHalsodeklarationAndBookings() {
+      if (!this.$store.state.user) {
+        this.loading = false;
+        return;
+      }
+
+      try {
+        var response = await fetch(this.apiUrl + '/api/check-halsodeklaration?userId=' + this.userId);
+        var data = await response.json();
+        this.halsodeklarationCompleted = data.completed === true;
+        console.log('PelviX: Hälsodeklaration status:', this.halsodeklarationCompleted);
+      } catch (error) {
+        console.error('PelviX: Error checking hälsodeklaration:', error);
+        this.halsodeklarationCompleted = false;
+      }
+
+      if (this.halsodeklarationCompleted) {
+        this.checkBookings();
+      } else {
+        this.loading = false;
+      }
+    },
+
     async checkBookings() {
       if (!this.$store.state.user) {
         this.loading = false;
@@ -454,8 +491,8 @@ export default {
   },
 
   mounted() {
-    // Check bookings immediately
-    this.checkBookings();
+    // Check hälsodeklaration and bookings immediately
+    this.checkHalsodeklarationAndBookings();
 
     // Update countdown every second
     this.countdownInterval = setInterval(() => {

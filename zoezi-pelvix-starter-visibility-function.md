@@ -8,14 +8,15 @@
 
 ## Overview
 
-The PelviX Starter component requires the user to have completed the Hälsodeklaration (health declaration form) before it becomes visible. The booking check logic is built into the component itself.
+The PelviX Starter component requires the user to have completed the Hälsodeklaration (health declaration form) before it allows starting the device. Since the Zoezi member API (`/api/memberapi/get/current`) does not include extra fields (`xf`), the hälsodeklaration check is done server-side via `GET /api/check-halsodeklaration?userId=X`.
 
-The visibility function checks:
-1. User is logged in
-2. User has completed the hälsodeklaration (`xf.halsodeklaration === true`)
+Both the component and the server enforce this check:
+1. **Component:** Calls the server endpoint on load, shows "Hälsodeklaration krävs" message if not completed
+2. **Server:** The `POST /api/start-pelvix` endpoint independently verifies `xf.halsodeklaration` via the Zoezi API key
 
 The component handles these states internally:
-- **Loading** - While fetching bookings
+- **Loading** - While checking hälsodeklaration and fetching bookings
+- **Hälsodeklaration required** - User has not completed the health declaration
 - **No booking** - User has no upcoming booking within 5 minutes
 - **Ready** - User has a booking starting within 5 minutes, can start the device
 - **Started** - Device successfully unlocked
@@ -23,19 +24,14 @@ The component handles these states internally:
 
 ---
 
-## Visibility Function (Recommended)
+## Visibility Function (Optional)
 
-Use this to show the component only for logged-in users who have completed the hälsodeklaration:
+Since the component handles all states internally (including the hälsodeklaration check),
+no visibility function is strictly needed. Optionally, add a simple login check:
 
 ```javascript
 try {
-  // Only show for logged-in users
   if (!window.$store || !window.$store.state || !window.$store.state.user) {
-    return false;
-  }
-  // Only show if hälsodeklaration is completed
-  var user = window.$store.state.user;
-  if (!user.xf || user.xf.halsodeklaration !== true) {
     return false;
   }
   return true;
@@ -49,19 +45,23 @@ try {
 
 ## Server-Side Enforcement
 
-In addition to the visibility function (which is UX-only), the server also enforces the hälsodeklaration check. If a user somehow accesses the PelviX Starter without completing the form, the `POST /api/start-pelvix` endpoint will return a 403 error with the message:
+The server enforces the hälsodeklaration check at two levels:
 
-> "Du måste fylla i hälsodeklarationen innan du kan starta PelviX."
+1. **`GET /api/check-halsodeklaration?userId=X`** - Returns `{ completed: true/false }` for UI gating
+2. **`POST /api/start-pelvix`** - Returns 403 if `xf.halsodeklaration` is not true:
+   > "Du måste fylla i hälsodeklarationen innan du kan starta PelviX."
+
+Both use the Zoezi API key to call `/api/user/get/{userId}` which includes the `xf` fields.
 
 ---
 
 ## Page Layout
 
 On the PelviX page, place both components:
-1. **Hälsodeklaration** (visible when `xf.halsodeklaration !== true`) - shows the form
-2. **PelviX Starter** (visible when `xf.halsodeklaration === true`) - shows the device control
+1. **Hälsodeklaration** - shows the form if not completed, renders empty if completed
+2. **PelviX Starter** - shows "Hälsodeklaration krävs" if not completed, shows device control if completed
 
-Only one will be visible at a time based on the user's hälsodeklaration status.
+Both components independently check the server. Only the relevant UI is visible at any time.
 
 ---
 

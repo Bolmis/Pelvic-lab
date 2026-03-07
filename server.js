@@ -319,6 +319,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Check hälsodeklaration status for a user - called by frontend components
+app.get('/api/check-halsodeklaration', async (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId parameter' });
+  }
+
+  try {
+    const completed = await checkHalsodeklaration(userId);
+    res.json({ completed });
+  } catch (error) {
+    console.error(`[Hälsodeklaration] Error checking for user ${userId}:`, error.message);
+    res.status(500).json({ error: 'Failed to check hälsodeklaration status' });
+  }
+});
+
 // Start PelviX session - called by the Zoezi component
 app.post('/api/start-pelvix', async (req, res) => {
   const startTime = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' });
