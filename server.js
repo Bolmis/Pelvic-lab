@@ -154,7 +154,7 @@ async function updateUserXf(userId, fieldName, value) {
     [fieldName]: value
   };
 
-  const url = `https://${ZOEZI_DOMAIN}/api/user/change`;
+  const url = `https://${ZOEZI_DOMAIN}/api/member/change`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
