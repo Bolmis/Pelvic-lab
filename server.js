@@ -393,6 +393,33 @@ function scheduleSessionAbort(transactionId, bookingEnd, patientName, patientId)
       return;
     }
 
+    // Check if user has another booking starting now (back-to-back)
+    try {
+      console.log(`[AutoLock] Checking for back-to-back booking for ${patientName} (${patientId})`);
+      const { hasActiveBooking, booking: nextBooking } = await verifyActiveResourceBooking(patientId);
+
+      if (hasActiveBooking && nextBooking) {
+        const [nDatePart, nTimePart] = nextBooking.time.split(' ');
+        const [nYear, nMonth, nDay] = nDatePart.split('-').map(Number);
+        const [nHour, nMinute, nSecond] = nTimePart.split(':').map(Number);
+        const nextStart = new Date(nYear, nMonth - 1, nDay, nHour, nMinute, nSecond || 0);
+        const nextDuration = nextBooking.duration || 60;
+        const nextEnd = new Date(nextStart.getTime() + nextDuration * 60 * 1000);
+
+        // If the next booking ends later than our current end, it's a follow-up
+        if (nextEnd.getTime() > session.bookingEnd.getTime()) {
+          console.log(`[AutoLock] Back-to-back booking found! Extending session until ${nextEnd.toLocaleString('sv-SE')}`);
+          session.bookingEnd = nextEnd;
+          activeSessions.delete(transactionId);
+          scheduleSessionAbort(transactionId, nextEnd, patientName, patientId);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error(`[AutoLock] Error checking back-to-back booking:`, error.message);
+      // Continue with abort if check fails
+    }
+
     session.status = 'aborting';
     console.log(`[AutoLock] Booking time expired for ${patientName} (${transactionId}), locking device`);
 
@@ -446,6 +473,29 @@ setInterval(async () => {
   for (const [txnId, session] of activeSessions) {
     if (session.status !== 'active') continue;
     if (nowStockholm > session.bookingEnd) {
+      // Check for back-to-back booking before aborting
+      try {
+        const { hasActiveBooking, booking: nextBooking } = await verifyActiveResourceBooking(session.patientId);
+        if (hasActiveBooking && nextBooking) {
+          const [nDatePart, nTimePart] = nextBooking.time.split(' ');
+          const [nYear, nMonth, nDay] = nDatePart.split('-').map(Number);
+          const [nHour, nMinute, nSecond] = nTimePart.split(':').map(Number);
+          const nextStart = new Date(nYear, nMonth - 1, nDay, nHour, nMinute, nSecond || 0);
+          const nextDuration = nextBooking.duration || 60;
+          const nextEnd = new Date(nextStart.getTime() + nextDuration * 60 * 1000);
+
+          if (nextEnd.getTime() > session.bookingEnd.getTime()) {
+            console.log(`[AutoLock Sweep] Back-to-back booking found for ${txnId}, extending to ${nextEnd.toLocaleString('sv-SE')}`);
+            clearTimeout(session.timer);
+            activeSessions.delete(txnId);
+            scheduleSessionAbort(txnId, nextEnd, session.patientName, session.patientId);
+            continue;
+          }
+        }
+      } catch (error) {
+        console.error(`[AutoLock Sweep] Error checking back-to-back for ${txnId}:`, error.message);
+      }
+
       console.log(`[AutoLock Sweep] Found expired session ${txnId}, forcing abort`);
       session.status = 'aborting';
       clearTimeout(session.timer);
