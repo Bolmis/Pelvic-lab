@@ -285,6 +285,40 @@ export default {
         console.log('Halsodeklaration - Fillout script loaded');
       };
       document.head.appendChild(script);
+    },
+
+    startPolling() {
+      if (this.pollInterval) return;
+      var self = this;
+      this.pollInterval = setInterval(function() {
+        if (!self.currentUserId) return;
+        // If form is already showing or completed, stop polling
+        if (self.hasFutureBooking && !self.hasCompleted) return;
+        if (self.hasCompleted) {
+          clearInterval(self.pollInterval);
+          self.pollInterval = null;
+          return;
+        }
+        console.log('Halsodeklaration - Polling for bookings...');
+        self.checkFutureBookings().then(function() {
+          if (self.hasFutureBooking && !self.hasCompleted) {
+            console.log('Halsodeklaration - Booking detected, showing form');
+            self.$nextTick(function() {
+              self.loadFilloutScript();
+            });
+          }
+        });
+      }, 30000);
+    }
+  },
+
+  mounted() {
+    this.startPolling();
+  },
+
+  beforeDestroy() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
     }
   }
 };

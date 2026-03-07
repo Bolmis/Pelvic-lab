@@ -531,12 +531,12 @@ export default {
       this.currentTime = new Date();
     }, 1000);
 
-    // Refresh bookings every 10 seconds
+    // Refresh hälsodeklaration + bookings every 15 seconds
     this.refreshInterval = setInterval(() => {
       if (this.status !== 'started' && this.status !== 'error') {
-        this.checkBookings();
+        this.checkHalsodeklarationAndBookings();
       }
-    }, 10000);
+    }, 15000);
   },
 
   beforeDestroy() {
