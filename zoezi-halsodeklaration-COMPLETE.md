@@ -76,11 +76,11 @@ try {
     <zoezi-identification :title="$translate('Logga in för att starta din PelviX-behandling')" />
   </template>
 
-  <!-- Already completed - render nothing, PelviX Starter takes over -->
-  <template v-else-if="hasCompleted">
+  <!-- Completed or no future booking - render nothing -->
+  <template v-else-if="hasCompleted || !hasFutureBooking">
   </template>
 
-  <!-- Form embed -->
+  <!-- Form embed - has future booking but hasn't completed hälsodeklaration -->
   <template v-else>
     <!-- Hero Section -->
     <div class="hd-hero">
@@ -156,7 +156,8 @@ export default {
     return {
       loading: true,
       currentUserId: null,
-      hasCompleted: false
+      hasCompleted: false,
+      hasFutureBooking: false
     };
   },
 
@@ -208,18 +209,58 @@ export default {
         console.log('Halsodeklaration - Status:', this.hasCompleted);
 
         if (!this.hasCompleted) {
-          this.$nextTick(() => {
-            this.loadFilloutScript();
-          });
+          await this.checkFutureBookings();
+          if (this.hasFutureBooking) {
+            this.$nextTick(() => {
+              this.loadFilloutScript();
+            });
+          }
         }
       } catch (error) {
         console.error('Halsodeklaration - Error checking status:', error);
         this.hasCompleted = false;
-        this.$nextTick(() => {
-          this.loadFilloutScript();
-        });
       } finally {
         this.loading = false;
+      }
+    },
+
+    async checkFutureBookings() {
+      try {
+        var now = new Date();
+        var today = now.getFullYear() + '-' +
+                    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(now.getDate()).padStart(2, '0');
+        var farFuture = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        var farFutureStr = farFuture.getFullYear() + '-' +
+                           String(farFuture.getMonth() + 1).padStart(2, '0') + '-' +
+                           String(farFuture.getDate()).padStart(2, '0');
+
+        var bookings = await this.$api.get('/api/memberapi/bookings/get', {
+          startTime: today,
+          endTime: farFutureStr
+        });
+
+        var hasAny = false;
+        if (bookings && bookings.resourcebookings) {
+          bookings.resourcebookings.forEach(function(category) {
+            if (category.bookings) {
+              category.bookings.forEach(function(booking) {
+                if (!booking.cancelled) {
+                  var bookingStart = new Date(booking.time.replace(' ', 'T'));
+                  if (bookingStart >= now) {
+                    hasAny = true;
+                  }
+                }
+              });
+            }
+          });
+        }
+
+        this.hasFutureBooking = hasAny;
+        console.log('Halsodeklaration - Has future booking:', hasAny);
+      } catch (error) {
+        console.error('Halsodeklaration - Error checking bookings:', error);
+        this.hasFutureBooking = false;
       }
     },
 

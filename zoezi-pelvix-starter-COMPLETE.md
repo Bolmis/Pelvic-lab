@@ -45,11 +45,64 @@ The backend (Replit) needs these environment variables:
 
 ```html
 <div class="zoezi-pelvix-starter">
-  <!-- Hidden while loading, not logged in, or hälsodeklaration not completed -->
-  <template v-if="loading || !$store.state.user || !halsodeklarationCompleted">
+  <!-- Hidden while loading or not logged in -->
+  <template v-if="loading || !$store.state.user">
   </template>
 
-  <!-- Main content - logged in user with completed hälsodeklaration -->
+  <!-- Hidden when has future booking but hälsodeklaration not done (form component shows instead) -->
+  <template v-else-if="hasFutureBooking && !halsodeklarationCompleted">
+  </template>
+
+  <!-- No future booking - show buy/book buttons -->
+  <template v-else-if="!hasFutureBooking">
+    <div class="pxs-hero">
+      <div class="pxs-hero-content">
+        <div class="pxs-hero-badge">Bäckenbottenträning</div>
+        <h1 class="pxs-hero-title">PelviX</h1>
+        <p class="pxs-hero-subtitle">Välkommen, {{ userName }}!</p>
+      </div>
+      <div class="pxs-hero-decoration"></div>
+    </div>
+
+    <div class="pxs-card">
+      <div class="pxs-card-icon pxs-waiting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h2 class="pxs-card-title">Kom igång med PelviX</h2>
+      <p class="pxs-card-text">
+        Du har ingen kommande bokning.<br>
+        Köp ett klippkort eller medlemskap, eller boka en tid.
+      </p>
+
+      <a href="/shoppa" class="pxs-start-button" style="display: flex; text-decoration: none;">
+        <span class="pxs-btn-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+          Köp klippkort / medlemskap
+        </span>
+      </a>
+
+      <a href="/boka" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
+        <span class="pxs-btn-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          Boka en tid
+        </span>
+      </a>
+    </div>
+  </template>
+
+  <!-- Main content - has future booking and hälsodeklaration completed -->
   <template v-else>
     <!-- Hero Section -->
     <div class="pxs-hero">
@@ -63,7 +116,7 @@ The backend (Replit) needs these environment variables:
 
     <!-- Main Card -->
     <div class="pxs-card">
-      <!-- No upcoming booking state -->
+      <!-- No upcoming booking state (has future booking, just not active right now) -->
       <template v-if="status === 'no-booking'">
         <div class="pxs-card-icon pxs-waiting">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -227,6 +280,7 @@ export default {
       loading: true,
       starting: false,
       halsodeklarationCompleted: false,
+      hasFutureBooking: false,
       status: 'no-booking',
       errorMessage: '',
       upcomingBooking: null,
@@ -323,11 +377,8 @@ export default {
         this.halsodeklarationCompleted = false;
       }
 
-      if (this.halsodeklarationCompleted) {
-        this.checkBookings();
-      } else {
-        this.loading = false;
-      }
+      // Always check bookings to know if we should show buy/book buttons
+      this.checkBookings();
     },
 
     async checkBookings() {
@@ -404,6 +455,7 @@ export default {
 
         this.upcomingBooking = activeBooking;
         this.nextBooking = nextBooking;
+        this.hasFutureBooking = allBookings.some(function(b) { return b.parsedStart >= now; });
 
         if (activeBooking) {
           this.status = 'ready';
