@@ -292,13 +292,26 @@ export default {
       var self = this;
       this.pollInterval = setInterval(function() {
         if (!self.currentUserId) return;
-        // If form is already showing or completed, stop polling
-        if (self.hasFutureBooking && !self.hasCompleted) return;
         if (self.hasCompleted) {
           clearInterval(self.pollInterval);
           self.pollInterval = null;
           return;
         }
+        // If form is showing, poll for completion status
+        if (self.hasFutureBooking) {
+          console.log('Halsodeklaration - Polling for completion status...');
+          fetch(self.apiUrl + '/api/check-halsodeklaration?userId=' + self.currentUserId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.completed === true) {
+                console.log('Halsodeklaration - Completed! Hiding form.');
+                self.hasCompleted = true;
+              }
+            })
+            .catch(function() {});
+          return;
+        }
+        // No booking yet, poll for new bookings
         console.log('Halsodeklaration - Polling for bookings...');
         self.checkFutureBookings().then(function() {
           if (self.hasFutureBooking && !self.hasCompleted) {
@@ -308,7 +321,7 @@ export default {
             });
           }
         });
-      }, 30000);
+      }, 15000);
     }
   },
 
