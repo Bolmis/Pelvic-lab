@@ -65,7 +65,7 @@ try {
 
 ```html
 <div class="zoezi-halsodeklaration">
-  <!-- Loading state -->
+  <!-- Loading state (shown for both components while checking) -->
   <div v-if="loading" class="hd-loading-state">
     <div class="hd-spinner"></div>
     <span>Kontrollerar status...</span>
@@ -73,10 +73,10 @@ try {
 
   <!-- Auth check - require login -->
   <template v-else-if="!$store.state.user">
-    <zoezi-identification :title="$translate('Logga in för att fylla i din hälsodeklaration')" />
+    <zoezi-identification :title="$translate('Logga in för att starta din PelviX-behandling')" />
   </template>
 
-  <!-- Already completed - hide completely (PelviX Starter will show instead) -->
+  <!-- Already completed - render nothing, PelviX Starter takes over -->
   <template v-else-if="hasCompleted">
   </template>
 
