@@ -339,7 +339,7 @@ export default {
   data() {
     return {
       loading: false,
-      loadingMessage: 'Laddar...',
+      loadingMessage: 'Laddar för succé',
       loadingCalendar: false,
       loadingTimes: false,
       error: null,
@@ -443,10 +443,16 @@ export default {
 
       // Logged in: check booking history
       this.loading = true;
-      this.loadingMessage = 'Kontrollerar din historik...';
 
       try {
-        const bookings = await window.$zoeziapi.get('/api/memberapi/bookings/get');
+        // Must pass startTime far back to get historical bookings
+        const tenYearsAgo = new Date();
+        tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+        const startTime = this.formatDateISO(tenYearsAgo) + ' 00:00';
+
+        const result = await window.$zoeziapi.get('/api/memberapi/bookings/get', {
+          startTime: startTime
+        });
 
         // Guard: if flow was resolved while we were waiting, abort
         if (this.flowResolved) {
@@ -455,7 +461,13 @@ export default {
           return;
         }
 
-        const hasHistory = Array.isArray(bookings) && bookings.length > 0;
+        // Response format: { resourcebookings: [{ bookings: [...] }], ... }
+        let hasHistory = false;
+        if (result && Array.isArray(result.resourcebookings)) {
+          hasHistory = result.resourcebookings.some(rb =>
+            Array.isArray(rb.bookings) && rb.bookings.length > 0
+          );
+        }
 
         if (hasHistory) {
           // Returning customer → regular PelviX
@@ -509,7 +521,7 @@ export default {
     // Fetch available services from API
     async fetchServices() {
       this.loading = true;
-      this.loadingMessage = 'Laddar behandlingar...';
+      this.loadingMessage = 'Laddar för succé';
 
       try {
         const response = await window.$zoeziapi.get('/api/public/resourcebooking/service/get');
@@ -722,7 +734,7 @@ export default {
       if (!this.selectedService || !this.selectedDate || !this.selectedTime) return;
 
       this.loading = true;
-      this.loadingMessage = 'Reserverar tid...';
+      this.loadingMessage = 'Laddar för succé';
 
       try {
         // Format datetime for reservation
