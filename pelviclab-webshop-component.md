@@ -596,16 +596,7 @@ export default {
     handleCheckoutComplete(result) {
       console.log('Checkout event:', result);
 
-      // Validate that this is an actual purchase, not just a cart clear
       if (!result) {
-        this.resetSelection();
-        return;
-      }
-
-      const hasOrderData = result.orderconfirmation && result.orderconfirmation.length > 0;
-      const hasOrderId = result.orderid || result.order_id;
-
-      if (!hasOrderData && !hasOrderId) {
         this.resetSelection();
         return;
       }
