@@ -81,7 +81,7 @@
           <line x1="12" y1="8" x2="12.01" y2="8"></line>
         </svg>
       </div>
-      <p>För att boka din första behandling behöver du ett provträningskort. Slutför köpet nedan så kan du boka din tid direkt.</p>
+      <p>För att boka din första behandling behöver du ett provträningskort. Slutför köpet nedan så kan du boka din tid direkt. <strong>Observera: kortet måste användas inom en vecka.</strong></p>
     </div>
 
     <div class="pl-checkout-content">
@@ -613,14 +613,18 @@ export default {
         return;
       }
 
-      // Check if user already has a valid intro card
+      // Check if user has ever had the intro card
       const user = this.$store.state.user;
+      let hasActiveIntroCard = false;
+      let hasEverHadIntroCard = false;
+
       if (user) {
         try {
           const cards = await this.$api.get('/api/memberapi/trainingcard/get/all');
           if (Array.isArray(cards)) {
-            this.hasIntroCard = cards.some(card => {
-              if (card.product_id !== this.introProductId) return false;
+            const introCards = cards.filter(card => card.product_id === this.introProductId);
+            hasEverHadIntroCard = introCards.length > 0;
+            hasActiveIntroCard = introCards.some(card => {
               if (!card.paid) return false;
               if (card.trainingsLeft !== null && card.trainingsLeft !== undefined && card.trainingsLeft <= 0) return false;
               return true;
@@ -631,11 +635,15 @@ export default {
         }
       }
 
-      if (this.hasIntroCard) {
-        // Already has intro card → go straight to calendar
+      if (hasEverHadIntroCard && !hasActiveIntroCard) {
+        // Had intro card before but used it → regular PelviX
+        this.selectServiceAndShowCalendar(this.regularService);
+      } else if (hasActiveIntroCard) {
+        // Has active intro card → intro calendar
+        this.hasIntroCard = true;
         this.selectServiceAndShowCalendar(this.introService);
       } else {
-        // Need to buy intro card first
+        // Never had intro card → buy it first
         this.selectedService = this.introService;
         this.flowResolved = true;
         this.introCheckoutItems = [{
