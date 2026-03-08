@@ -340,7 +340,7 @@ const products = [
       <h2 class="plw-confirmation-title">Tack för ditt köp!</h2>
       <p class="plw-confirmation-message">Din beställning är bekräftad. Välkommen till Pelvic Lab!</p>
 
-      <div v-if="orderDetails" class="plw-confirmation-details">
+      <div v-if="selectedProduct" class="plw-confirmation-details">
         <h3>Din beställning:</h3>
         <p><strong>{{ selectedProduct.name }}</strong></p>
         <p>{{ selectedProduct.subtitle }}</p>
@@ -593,11 +593,24 @@ export default {
       });
     },
 
-    handleCheckoutComplete() {
-      console.log('Checkout completed');
-      this.orderDetails = {
-        product: this.selectedProduct
-      };
+    handleCheckoutComplete(result) {
+      console.log('Checkout event:', result);
+
+      // Validate that this is an actual purchase, not just a cart clear
+      if (!result) {
+        this.resetSelection();
+        return;
+      }
+
+      const hasOrderData = result.orderconfirmation && result.orderconfirmation.length > 0;
+      const hasOrderId = result.orderid || result.order_id;
+
+      if (!hasOrderData && !hasOrderId) {
+        this.resetSelection();
+        return;
+      }
+
+      this.orderDetails = result;
       this.showCheckoutSection = false;
       this.checkoutCompleted = true;
       this.showConfirmation = true;
@@ -1016,19 +1029,22 @@ export default {
 /* Checkout Section (Inline) */
 .plw-checkout-section {
   background: var(--plw-gray-50);
-  border-radius: var(--plw-radius-xl);
-  padding: 32px 24px;
-  margin-top: 48px;
-  margin-bottom: 48px;
+  border-radius: var(--plw-radius-lg);
+  padding: 24px 20px;
+  margin-top: 32px;
+  margin-bottom: 32px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .plw-checkout-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .plw-checkout-header h2 {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--plw-gray-900);
   margin: 0;
 }
@@ -1056,32 +1072,31 @@ export default {
 
 /* Checkout Summary */
 .plw-checkout-summary {
-  padding: 20px 24px;
+  padding: 14px 16px;
   background: var(--plw-white);
   border-radius: var(--plw-radius);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .plw-summary-product {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .plw-summary-icon {
-  width: 56px;
-  height: 56px;
-  background: var(--plw-white);
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  background: var(--plw-gray-50);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--plw-shadow-sm);
 }
 
 .plw-summary-icon svg {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   stroke: var(--plw-gold);
 }
 
@@ -1090,14 +1105,14 @@ export default {
 }
 
 .plw-summary-details h3 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--plw-gray-900);
-  margin: 0 0 2px 0;
+  margin: 0 0 1px 0;
 }
 
 .plw-summary-details p {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--plw-gray-500);
   margin: 0;
 }
@@ -1107,13 +1122,13 @@ export default {
 }
 
 .plw-summary-amount {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--plw-gray-900);
 }
 
 .plw-summary-period {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--plw-gray-500);
 }
 
@@ -1157,7 +1172,7 @@ export default {
 .plw-checkout-content {
   background: var(--plw-white);
   border-radius: var(--plw-radius);
-  padding: 24px;
+  padding: 16px;
 }
 
 /* Buttons */
@@ -1226,41 +1241,41 @@ export default {
 .plw-confirmation-modal {
   background: var(--plw-white);
   border-radius: var(--plw-radius-lg);
-  padding: 48px 40px;
-  max-width: 480px;
+  padding: 36px 28px;
+  max-width: 440px;
   width: 100%;
   text-align: center;
   box-shadow: var(--plw-shadow-xl);
 }
 
 .plw-confirmation-icon {
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  height: 64px;
   background: linear-gradient(135deg, rgba(201, 169, 98, 0.1) 0%, rgba(201, 169, 98, 0.2) 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 24px;
+  margin: 0 auto 20px;
 }
 
 .plw-confirmation-icon svg {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   stroke: var(--plw-gold);
 }
 
 .plw-confirmation-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--plw-gray-900);
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
 }
 
 .plw-confirmation-message {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--plw-gray-600);
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
 }
 
 .plw-confirmation-details {

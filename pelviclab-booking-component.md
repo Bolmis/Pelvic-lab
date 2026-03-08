@@ -98,6 +98,22 @@
       </div>
     </div>
 
+    <!-- Upsell Banner (logged-in users without active card) -->
+    <a
+      v-if="!hasActiveCard && selectedService && $store.state.user && (currentStep === 'calendar' || currentStep === 'time')"
+      :href="webshopUrl"
+      class="pl-upsell-banner"
+    >
+      <span class="pl-upsell-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <rect x="2" y="4" width="20" height="16" rx="2" ry="2"/>
+          <line x1="2" y1="10" x2="22" y2="10"/>
+        </svg>
+      </span>
+      <span class="pl-upsell-text">Spara med klippkort / medlemskap</span>
+      <span class="pl-upsell-arrow">→</span>
+    </a>
+
     <!-- Calendar Step -->
     <div v-if="currentStep === 'calendar'" class="pl-step pl-step-calendar">
       <div v-if="loadingCalendar" class="pl-loading-inline">
@@ -333,12 +349,17 @@ export default {
       title: 'Regular service name (for returning customers)',
       type: String,
       default: 'PelviX'
+    },
+    webshopUrl: {
+      title: 'Webshop page URL (for upsell banner)',
+      type: String,
+      default: '/erbjudanden'
     }
   },
 
   data() {
     return {
-      loading: false,
+      loading: true,
       loadingMessage: 'Laddar för succé',
       loadingCalendar: false,
       loadingTimes: false,
@@ -347,6 +368,9 @@ export default {
       // Steps: question -> calendar -> time
       currentStep: 'question',
       flowResolved: false,
+
+      // Klippkort/membership upsell
+      hasActiveCard: false,
 
       // Services - loaded from API
       availableServices: [],
@@ -498,7 +522,34 @@ export default {
       this.flowResolved = true;
       this.currentStep = 'calendar';
       this.loading = false;
+      this.checkActiveCard();
       this.loadCalendarAvailability();
+    },
+
+    // Check if user has an active PelviX klippkort or membership
+    checkActiveCard() {
+      const user = this.$store && this.$store.state && this.$store.state.user;
+      if (!user) {
+        this.hasActiveCard = false;
+        return;
+      }
+
+      const userCards = user.cards || (this.$store.state.cards) || [];
+      if (!Array.isArray(userCards) || userCards.length === 0) {
+        this.hasActiveCard = false;
+        return;
+      }
+
+      this.hasActiveCard = userCards.some(card => {
+        const cardName = (card.cardtype_name || card.name || '').toLowerCase();
+        if (!cardName.includes('pelvix') && !cardName.includes('pelvi')) return false;
+        // Klippkort: must have trainings left
+        if (card.trainingsLeft !== undefined && card.trainingsLeft !== null) {
+          return card.trainingsLeft > 0;
+        }
+        // Membership: active if card exists (unlimited trainings)
+        return true;
+      });
     },
 
     // Handle the Ja/Nej question for non-logged-in users
@@ -1521,20 +1572,61 @@ export default {
   font-size: 14px;
 }
 
+/* Upsell Banner */
+.pl-upsell-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(201, 169, 98, 0.08) 0%, rgba(201, 169, 98, 0.14) 100%);
+  border: 1px solid var(--pl-gold-light);
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--pl-transition);
+}
+
+.pl-upsell-banner:hover {
+  background: linear-gradient(135deg, rgba(201, 169, 98, 0.12) 0%, rgba(201, 169, 98, 0.2) 100%);
+  border-color: var(--pl-gold);
+}
+
+.pl-upsell-icon {
+  flex-shrink: 0;
+  color: var(--pl-gold-dark);
+}
+
+.pl-upsell-icon svg {
+  stroke: var(--pl-gold-dark);
+}
+
+.pl-upsell-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-gold-dark);
+}
+
+.pl-upsell-arrow {
+  font-size: 14px;
+  color: var(--pl-gold);
+}
+
 /* Checkout Section (Inline) */
 .pl-checkout-section {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius-lg);
-  padding: 24px 20px;
+  padding: 20px 16px;
   margin-top: 16px;
 }
 
 .pl-checkout-header {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .pl-checkout-header h2 {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--pl-gray-900);
   margin: 0;
@@ -1543,24 +1635,24 @@ export default {
 .pl-checkout-summary {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 16px 20px;
-  margin-bottom: 16px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
 .pl-checkout-summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 
 .pl-checkout-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--pl-gray-600);
 }
 
 .pl-checkout-value {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--pl-gray-900);
 }
@@ -1568,7 +1660,7 @@ export default {
 .pl-checkout-content {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 20px;
+  padding: 16px;
 }
 
 /* Confirmation Modal */
