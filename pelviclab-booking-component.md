@@ -897,21 +897,14 @@ export default {
     onCheckoutComplete(result) {
       console.log('Checkout complete:', result);
 
-      // Validate that this is an actual successful booking, not just a cart clear
+      // If no result at all, treat as cart clear
       if (!result) {
         this.resetSelection();
         return;
       }
 
-      // Check if we have actual order confirmation data
-      const hasOrderData = result.orderconfirmation && result.orderconfirmation.length > 0;
-      const hasOrderId = result.orderid || result.order_id;
-
-      if (!hasOrderData && !hasOrderId) {
-        this.resetSelection();
-        return;
-      }
-
+      // For resource bookings, @almostdone fires with result data on success.
+      // Accept any truthy result as a successful booking.
       this.orderDetails = result;
       this.showCheckoutSection = false;
       this.checkoutCompleted = true;
