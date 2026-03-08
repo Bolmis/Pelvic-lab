@@ -362,7 +362,7 @@ const products = [
       </div>
 
       <div class="plw-confirmation-actions">
-        <a href="/bokning" class="plw-button plw-button-primary">Boka behandling</a>
+        <a href="/boka" class="plw-button plw-button-primary">Boka behandling</a>
         <a href="/minasidor" class="plw-button plw-button-secondary">Mina sidor</a>
         <button @click="closeConfirmation" class="plw-button plw-button-text">Stäng</button>
       </div>
@@ -1387,10 +1387,15 @@ export default {
   text-decoration: none;
 }
 
-.plw-button-primary {
+.plw-button-primary,
+a.plw-button-primary,
+a.plw-button-primary:visited,
+a.plw-button-primary:hover,
+a.plw-button-primary:active {
   background: linear-gradient(135deg, var(--plw-gold) 0%, var(--plw-gold-dark) 100%);
-  color: var(--plw-white);
+  color: var(--plw-white) !important;
   box-shadow: var(--plw-shadow);
+  text-decoration: none;
 }
 
 .plw-button-primary:hover {
@@ -1398,10 +1403,14 @@ export default {
   box-shadow: var(--plw-shadow-lg);
 }
 
-.plw-button-secondary {
+.plw-button-secondary,
+a.plw-button-secondary,
+a.plw-button-secondary:visited,
+a.plw-button-secondary:active {
   background: var(--plw-white);
-  color: var(--plw-gray-700);
+  color: var(--plw-gray-700) !important;
   border: 2px solid var(--plw-gray-200);
+  text-decoration: none;
 }
 
 .plw-button-secondary:hover {

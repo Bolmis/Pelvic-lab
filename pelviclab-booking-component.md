@@ -1480,10 +1480,15 @@ export default {
   text-decoration: none;
 }
 
-.pl-button-primary {
+.pl-button-primary,
+a.pl-button-primary,
+a.pl-button-primary:visited,
+a.pl-button-primary:hover,
+a.pl-button-primary:active {
   background: linear-gradient(135deg, var(--pl-gold) 0%, var(--pl-gold-dark) 100%);
-  color: var(--pl-white);
+  color: var(--pl-white) !important;
   box-shadow: var(--pl-shadow);
+  text-decoration: none;
 }
 
 .pl-button-primary:hover {
@@ -1491,10 +1496,14 @@ export default {
   box-shadow: var(--pl-shadow-lg);
 }
 
-.pl-button-secondary {
+.pl-button-secondary,
+a.pl-button-secondary,
+a.pl-button-secondary:visited,
+a.pl-button-secondary:active {
   background: var(--pl-white);
-  color: var(--pl-gray-700);
+  color: var(--pl-gray-700) !important;
   border: 1.5px solid var(--pl-gray-200);
+  text-decoration: none;
 }
 
 .pl-button-secondary:hover {
