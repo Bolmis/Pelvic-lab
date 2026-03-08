@@ -325,7 +325,14 @@ export default {
     nextBookingTime() {
       if (!this.nextBooking) return '';
       const time = new Date(this.nextBooking.time.replace(' ', 'T'));
-      return 'kl. ' + time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      const isToday = time.toDateString() === now.toDateString();
+      const timeStr = time.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+      if (isToday) {
+        return 'kl. ' + timeStr;
+      }
+      const dateStr = time.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' });
+      return dateStr + ' kl. ' + timeStr;
     },
 
     nextBookingCountdown() {
@@ -333,18 +340,21 @@ export default {
       const bookingTime = new Date(this.nextBooking.time.replace(' ', 'T'));
       const diffMs = bookingTime.getTime() - this.currentTime.getTime();
 
-      // Only show countdown if within 1 hour
-      if (diffMs <= 0 || diffMs > 60 * 60 * 1000) return '';
+      if (diffMs <= 0) return '';
 
-      const diffMin = Math.floor(diffMs / 60000);
-      const diffSec = Math.floor((diffMs % 60000) / 1000);
+      const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+      const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+      const mins = Math.floor((diffMs % (60 * 60 * 1000)) / 60000);
+      const secs = Math.floor((diffMs % 60000) / 1000);
 
-      if (diffMin >= 60) {
-        return '';
-      } else if (diffMin > 0) {
-        return diffMin + ' min ' + diffSec + ' sek';
+      if (days > 0) {
+        return days + ' dag' + (days !== 1 ? 'ar' : '') + ', ' + hours + ' tim, ' + mins + ' min';
+      } else if (hours > 0) {
+        return hours + ' tim, ' + mins + ' min, ' + secs + ' sek';
+      } else if (mins > 0) {
+        return mins + ' min ' + secs + ' sek';
       } else {
-        return diffSec + ' sekunder';
+        return secs + ' sekunder';
       }
     }
   },
@@ -392,14 +402,14 @@ export default {
         const today = now.getFullYear() + '-' +
                       String(now.getMonth() + 1).padStart(2, '0') + '-' +
                       String(now.getDate()).padStart(2, '0');
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const tomorrowStr = tomorrow.getFullYear() + '-' +
-                            String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' +
-                            String(tomorrow.getDate()).padStart(2, '0');
+        const farFuture = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+        const farFutureStr = farFuture.getFullYear() + '-' +
+                              String(farFuture.getMonth() + 1).padStart(2, '0') + '-' +
+                              String(farFuture.getDate()).padStart(2, '0');
 
         const bookings = await this.$api.get('/api/memberapi/bookings/get', {
           startTime: today,
-          endTime: tomorrowStr
+          endTime: farFutureStr
         });
 
         console.log('PelviX: Checking bookings', bookings);

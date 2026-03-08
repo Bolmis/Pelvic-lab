@@ -312,9 +312,19 @@
         <p>Du kommer sitta bekvämt och fullt påklädd under hela behandlingen.</p>
       </div>
 
+      <div class="pl-confirmation-info">
+        <div class="pl-info-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <p>5 minuter innan din bokning börjar kommer du kunna aktivera PelviX via "Aktivera". Observera att du måste fylla i en hälsodeklaration för att kunna aktivera PelviX. Det kan du redan nu göra via länken nedan.</p>
+      </div>
+
       <div class="pl-confirmation-actions">
-        <a href="/minasidor" class="pl-button pl-button-primary">Mina sidor</a>
-        <button @click="closeConfirmation" class="pl-button pl-button-secondary">Stäng</button>
+        <a href="/starta" class="pl-button pl-button-primary">Till aktiveringssidan</a>
+        <a href="/minasidor" class="pl-button pl-button-secondary">Mina sidor</a>
+        <button @click="closeConfirmation" class="pl-button pl-button-outline">Stäng</button>
       </div>
     </div>
   </div>
@@ -393,6 +403,7 @@ export default {
       checkoutItems: [],
       checkoutCompleted: false,
       checkoutLoading: false,
+      checkoutPollInterval: null,
 
       // Confirmation
       showConfirmation: false,
@@ -867,12 +878,13 @@ export default {
         this.loading = false;
         this.showCheckoutSection = true;
 
-        // Scroll to checkout section
+        // Scroll to checkout section and start polling
         this.$nextTick(() => {
           const checkoutElement = document.querySelector('.pl-checkout-section');
           if (checkoutElement) {
             checkoutElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
+          this.startCheckoutPolling();
         });
 
       } catch (error) {
@@ -884,6 +896,10 @@ export default {
 
     // Reset selection and hide checkout
     resetSelection() {
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
+        this.checkoutPollInterval = null;
+      }
       this.showCheckoutSection = false;
       this.checkoutCompleted = false;
       this.selectedTime = null;
@@ -894,21 +910,65 @@ export default {
       });
     },
 
-    onCheckoutComplete(result) {
-      console.log('Checkout complete:', result);
-
-      // If no result at all, treat as cart clear
-      if (!result) {
-        this.resetSelection();
-        return;
+    // Polling backup: zoezi-checkout @done event doesn't always fire
+    startCheckoutPolling() {
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
       }
 
-      // For resource bookings, @almostdone fires with result data on success.
-      // Accept any truthy result as a successful booking.
-      this.orderDetails = result;
+      let checkCount = 0;
+
+      this.checkoutPollInterval = setInterval(() => {
+        checkCount++;
+
+        if (!this.showCheckoutSection) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+          return;
+        }
+
+        if (this.$refs.checkout && this.$refs.checkout.done === true) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+
+          const orderData = this.$refs.checkout.orderconfirmation;
+          this.handleCheckoutSuccess({
+            status: 'done',
+            paid: true,
+            orderconfirmation: orderData || []
+          });
+          return;
+        }
+
+        if (checkCount > 1000) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+        }
+      }, 300);
+    },
+
+    handleCheckoutSuccess(eventData) {
+      if (!eventData) return;
+
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
+        this.checkoutPollInterval = null;
+      }
+
+      let orderData = eventData;
+      if (eventData.detail) orderData = eventData.detail;
+      else if (eventData.data) orderData = eventData.data;
+
+      this.orderDetails = orderData;
       this.showCheckoutSection = false;
       this.checkoutCompleted = true;
       this.showConfirmation = true;
+    },
+
+    onCheckoutComplete(result) {
+      console.log('Checkout complete:', result);
+      if (!result) return;
+      this.handleCheckoutSuccess(result);
     },
 
     closeConfirmation() {

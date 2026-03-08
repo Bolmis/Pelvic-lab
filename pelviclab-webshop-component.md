@@ -464,6 +464,7 @@ export default {
       showCheckoutSection: false,
       checkoutItems: [],
       checkoutCompleted: false,
+      checkoutPollInterval: null,
 
       // Confirmation
       showConfirmation: false,
@@ -549,12 +550,13 @@ export default {
       this.prepareCheckout();
       this.showCheckoutSection = true;
 
-      // Scroll to checkout section
+      // Scroll to checkout section and start polling
       this.$nextTick(() => {
         const checkoutElement = document.querySelector('.plw-checkout-section');
         if (checkoutElement) {
           checkoutElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        this.startCheckoutPolling();
       });
     },
 
@@ -582,6 +584,10 @@ export default {
     },
 
     resetSelection() {
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
+        this.checkoutPollInterval = null;
+      }
       this.showCheckoutSection = false;
       this.selectedProduct = null;
       this.checkoutItems = [];
@@ -593,18 +599,65 @@ export default {
       });
     },
 
-    handleCheckoutComplete(result) {
-      console.log('Checkout event:', result);
-
-      if (!result) {
-        this.resetSelection();
-        return;
+    // Polling backup: zoezi-checkout @done event doesn't always fire
+    startCheckoutPolling() {
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
       }
 
-      this.orderDetails = result;
+      let checkCount = 0;
+
+      this.checkoutPollInterval = setInterval(() => {
+        checkCount++;
+
+        if (!this.showCheckoutSection) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+          return;
+        }
+
+        if (this.$refs.checkout && this.$refs.checkout.done === true) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+
+          const orderData = this.$refs.checkout.orderconfirmation;
+          this.handleCheckoutSuccess({
+            status: 'done',
+            paid: true,
+            orderconfirmation: orderData || []
+          });
+          return;
+        }
+
+        if (checkCount > 1000) {
+          clearInterval(this.checkoutPollInterval);
+          this.checkoutPollInterval = null;
+        }
+      }, 300);
+    },
+
+    handleCheckoutSuccess(eventData) {
+      if (!eventData) return;
+
+      if (this.checkoutPollInterval) {
+        clearInterval(this.checkoutPollInterval);
+        this.checkoutPollInterval = null;
+      }
+
+      let orderData = eventData;
+      if (eventData.detail) orderData = eventData.detail;
+      else if (eventData.data) orderData = eventData.data;
+
+      this.orderDetails = orderData;
       this.showCheckoutSection = false;
       this.checkoutCompleted = true;
       this.showConfirmation = true;
+    },
+
+    handleCheckoutComplete(result) {
+      console.log('Checkout event:', result);
+      if (!result) return;
+      this.handleCheckoutSuccess(result);
     },
 
     closeConfirmation() {
