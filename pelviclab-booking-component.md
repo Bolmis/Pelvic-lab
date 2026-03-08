@@ -67,8 +67,39 @@
     <button @click="clearError" class="pl-button pl-button-secondary">Försök igen</button>
   </div>
 
+  <!-- Intro Card Checkout (buy trial card before booking) -->
+  <div v-if="showIntroCheckout && !loading" class="pl-checkout-section">
+    <div class="pl-checkout-header">
+      <h2>Kom igång med PelviX</h2>
+    </div>
+
+    <div class="pl-intro-info">
+      <div class="pl-info-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+      </div>
+      <p>För att boka din första behandling behöver du ett provträningskort. Slutför köpet nedan så kan du boka din tid direkt.</p>
+    </div>
+
+    <div class="pl-checkout-content">
+      <zoezi-checkout
+        ref="introCheckout"
+        :items="introCheckoutItems"
+        :dialog="false"
+        :show-back-link="false"
+        :new-style-done-dialog="false"
+        @done="onIntroCheckoutComplete"
+        @almostdone="onIntroCheckoutComplete"
+        @close="resetIntroCheckout"
+      />
+    </div>
+  </div>
+
   <!-- Main Booking Flow -->
-  <div v-if="!loading && !error && !showCheckoutSection">
+  <div v-if="!loading && !error && !showCheckoutSection && !showIntroCheckout">
 
     <!-- Slim Header (replaces old hero) -->
     <div v-if="selectedService" class="pl-header">
@@ -364,6 +395,11 @@ export default {
       title: 'Webshop page URL (for upsell banner)',
       type: String,
       default: '/erbjudanden'
+    },
+    introProductId: {
+      title: 'Product ID for intro/provträning clip card',
+      type: Number,
+      default: 0
     }
   },
 
@@ -381,6 +417,12 @@ export default {
 
       // Klippkort/membership upsell
       hasActiveCard: false,
+
+      // Intro card flow
+      hasIntroCard: false,
+      showIntroCheckout: false,
+      introCheckoutItems: [],
+      introCheckoutPollInterval: null,
 
       // Services - loaded from API
       availableServices: [],
@@ -508,8 +550,8 @@ export default {
           // Returning customer → regular PelviX
           this.selectServiceAndShowCalendar(this.regularService);
         } else {
-          // New customer → intro PelviX
-          this.selectServiceAndShowCalendar(this.introService);
+          // New customer → check if they need to buy intro card first
+          await this.handleIntroFlow();
         }
       } catch (err) {
         console.error('Error checking booking history:', err);
@@ -563,12 +605,120 @@ export default {
       });
     },
 
+    // Handle intro flow: check if user has intro card, show checkout if not
+    async handleIntroFlow() {
+      // No intro product configured → go straight to calendar
+      if (!this.introProductId) {
+        this.selectServiceAndShowCalendar(this.introService);
+        return;
+      }
+
+      // Check if user already has a valid intro card
+      const user = this.$store.state.user;
+      if (user) {
+        try {
+          const cards = await this.$api.get('/api/memberapi/trainingcard/get/all');
+          if (Array.isArray(cards)) {
+            this.hasIntroCard = cards.some(card => {
+              if (card.product_id !== this.introProductId) return false;
+              if (!card.paid) return false;
+              if (card.trainingsLeft !== null && card.trainingsLeft !== undefined && card.trainingsLeft <= 0) return false;
+              return true;
+            });
+          }
+        } catch (err) {
+          console.error('Error checking intro cards:', err);
+        }
+      }
+
+      if (this.hasIntroCard) {
+        // Already has intro card → go straight to calendar
+        this.selectServiceAndShowCalendar(this.introService);
+      } else {
+        // Need to buy intro card first
+        this.selectedService = this.introService;
+        this.flowResolved = true;
+        this.introCheckoutItems = [{
+          product_id: this.introProductId,
+          count: 1,
+          users: user ? [user.id || user.userId] : [],
+          site_id: 1
+        }];
+        this.showIntroCheckout = true;
+        this.loading = false;
+
+        this.$nextTick(() => {
+          this.startIntroCheckoutPolling();
+        });
+      }
+    },
+
+    startIntroCheckoutPolling() {
+      if (this.introCheckoutPollInterval) {
+        clearInterval(this.introCheckoutPollInterval);
+      }
+
+      let checkCount = 0;
+
+      this.introCheckoutPollInterval = setInterval(() => {
+        checkCount++;
+
+        if (!this.showIntroCheckout) {
+          clearInterval(this.introCheckoutPollInterval);
+          this.introCheckoutPollInterval = null;
+          return;
+        }
+
+        if (this.$refs.introCheckout && this.$refs.introCheckout.done === true) {
+          clearInterval(this.introCheckoutPollInterval);
+          this.introCheckoutPollInterval = null;
+          this.onIntroCheckoutComplete(this.$refs.introCheckout.orderconfirmation || {});
+          return;
+        }
+
+        if (checkCount > 1000) {
+          clearInterval(this.introCheckoutPollInterval);
+          this.introCheckoutPollInterval = null;
+        }
+      }, 300);
+    },
+
+    onIntroCheckoutComplete(result) {
+      if (!result) return;
+
+      if (this.introCheckoutPollInterval) {
+        clearInterval(this.introCheckoutPollInterval);
+        this.introCheckoutPollInterval = null;
+      }
+
+      this.showIntroCheckout = false;
+      this.hasIntroCard = true;
+
+      // Now show the calendar to book their intro session
+      this.currentStep = 'calendar';
+      this.loading = false;
+      this.checkActiveCard();
+      this.loadCalendarAvailability();
+    },
+
+    resetIntroCheckout() {
+      if (this.introCheckoutPollInterval) {
+        clearInterval(this.introCheckoutPollInterval);
+        this.introCheckoutPollInterval = null;
+      }
+      this.showIntroCheckout = false;
+      this.introCheckoutItems = [];
+      this.flowResolved = false;
+      this.currentStep = 'question';
+    },
+
     // Handle the Ja/Nej question for non-logged-in users
-    answerQuestion(hasHistory) {
+    async answerQuestion(hasHistory) {
       if (hasHistory) {
         this.selectServiceAndShowCalendar(this.regularService);
       } else {
-        this.selectServiceAndShowCalendar(this.introService);
+        this.loading = true;
+        await this.handleIntroFlow();
       }
     },
 
@@ -1982,7 +2132,8 @@ a.pl-button-secondary:active {
   font-size: 14px;
 }
 
-.pl-confirmation-info {
+.pl-confirmation-info,
+.pl-intro-info {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -2001,7 +2152,8 @@ a.pl-button-secondary:active {
   stroke: var(--pl-gold);
 }
 
-.pl-confirmation-info p {
+.pl-confirmation-info p,
+.pl-intro-info p {
   margin: 0;
   font-size: 13px;
   color: var(--pl-gray-700);
