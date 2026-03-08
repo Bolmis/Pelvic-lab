@@ -1,7 +1,7 @@
 # Pelvic Lab PelviX Booking Component - COMPLETE (Copy-Paste Ready)
 
 **Component Type:** User-Facing Booking Component
-**Purpose:** Allow users to book PelviX treatments with calendar selection
+**Purpose:** Allow users to book PelviX treatments with smart service auto-selection
 **Access Level:** Public (with login for checkout)
 **Zoezi Domain:** pelviclab.zoezi.se
 
@@ -9,8 +9,10 @@
 
 ## Features
 
-- Premium white/gray/gold design
-- Service selection (PelviX första gången, PelviX)
+- Smart service routing: auto-selects service based on user booking history
+- Logged-in users skip service selection entirely
+- Non-logged-in users get a simple question to determine service
+- Elegant white/gold design with slim calendar
 - Interactive calendar with available dates
 - Time slot selection
 - Inline Zoezi checkout (not modal)
@@ -22,14 +24,10 @@
 ## Services Configuration
 
 ```javascript
-// Available services from Zoezi
-const services = [
-  { id: 1, name: "PelviX första gången", duration: 30, description: "Introduktionsbehandling för nya kunder" },
-  { id: 2, name: "PelviX", duration: 30, description: "Ordinarie PelviX-behandling" }
-];
-
-// Resource (room)
-const resource = { id: 6, name: "PelviX-rum", type: "resource", resourceType: "room" };
+// Available services from Zoezi (configured via props)
+// introServiceName: "PelviX första gången" (for new customers)
+// regularServiceName: "PelviX" (for returning customers)
+// Service IDs are resolved dynamically from the API
 ```
 
 ---
@@ -72,82 +70,36 @@ const resource = { id: 6, name: "PelviX-rum", type: "resource", resourceType: "r
   <!-- Main Booking Flow -->
   <div v-if="!loading && !error && !showCheckoutSection">
 
-    <!-- Hero Section -->
-    <div class="pl-hero">
-      <div class="pl-hero-content">
-        <div class="pl-hero-badge">Medicinsk Bäckenbottenträning</div>
-        <h1 class="pl-hero-title">Boka PelviX</h1>
-        <p class="pl-hero-subtitle">Stärk din bäckenbotten på 22 minuter - helt utan fysisk ansträngning</p>
-      </div>
-      <div class="pl-hero-accent"></div>
+    <!-- Slim Header (replaces old hero) -->
+    <div v-if="selectedService" class="pl-header">
+      <div class="pl-header-label">Boka behandling</div>
+      <h1 class="pl-header-title">{{ selectedService.name }}</h1>
+      <div class="pl-header-divider"></div>
     </div>
 
-    <!-- Step 1: Service Selection -->
-    <div v-if="currentStep === 'service'" class="pl-step pl-step-service">
-      <div class="pl-step-header">
-        <span class="pl-step-number">1</span>
-        <h2 class="pl-step-title">Välj behandling</h2>
-      </div>
-
-      <div class="pl-services-grid">
-        <div
-          v-for="service in availableServices"
-          :key="service.id"
-          class="pl-service-card"
-          :class="{ 'pl-selected': selectedService && selectedService.id === service.id }"
-          @click="selectService(service)"
-        >
-          <div class="pl-service-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-              <circle cx="12" cy="9" r="2.5"/>
-            </svg>
-          </div>
-          <div class="pl-service-content">
-            <h3 class="pl-service-name">{{ service.name }}</h3>
-            <p class="pl-service-description">{{ service.description || 'PelviX-behandling i vår studio' }}</p>
-            <div class="pl-service-meta">
-              <span class="pl-service-duration">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                {{ service.duration }} min
-              </span>
-            </div>
-          </div>
-          <div class="pl-service-check">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
+    <!-- Question Step (non-logged-in users only) -->
+    <div v-if="currentStep === 'question'" class="pl-step pl-step-question">
+      <div class="pl-question-card">
+        <div class="pl-question-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </div>
+        <h2 class="pl-question-title">Välkommen till PelviX</h2>
+        <p class="pl-question-text">Har du gjort behandling hos oss tidigare?</p>
+        <div class="pl-question-buttons">
+          <button @click="answerQuestion(true)" class="pl-button pl-button-primary">
+            Ja
+          </button>
+          <button @click="answerQuestion(false)" class="pl-button pl-button-outline">
+            Nej, det är min första gång
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Step 2: Calendar -->
+    <!-- Calendar Step -->
     <div v-if="currentStep === 'calendar'" class="pl-step pl-step-calendar">
-      <!-- Selection Summary -->
-      <div class="pl-selection-summary">
-        <div class="pl-summary-item" @click="goToStep('service')">
-          <div class="pl-summary-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-          </div>
-          <div class="pl-summary-text">
-            <span class="pl-summary-label">Behandling</span>
-            <span class="pl-summary-value">{{ selectedService.name }}</span>
-          </div>
-          <span class="pl-summary-edit">Ändra</span>
-        </div>
-      </div>
-
-      <div class="pl-step-header">
-        <span class="pl-step-number">2</span>
-        <h2 class="pl-step-title">Välj datum</h2>
-      </div>
-
       <div v-if="loadingCalendar" class="pl-loading-inline">
         <div class="pl-spinner-small"></div>
         <p>Laddar tillgängliga datum...</p>
@@ -203,23 +155,10 @@ const resource = { id: 6, name: "PelviX-rum", type: "resource", resourceType: "r
       </div>
     </div>
 
-    <!-- Step 3: Time Selection -->
+    <!-- Time Selection Step -->
     <div v-if="currentStep === 'time'" class="pl-step pl-step-time">
-      <!-- Selection Summary -->
+      <!-- Date summary -->
       <div class="pl-selection-summary">
-        <div class="pl-summary-item" @click="goToStep('service')">
-          <div class="pl-summary-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-          </div>
-          <div class="pl-summary-text">
-            <span class="pl-summary-label">Behandling</span>
-            <span class="pl-summary-value">{{ selectedService.name }}</span>
-          </div>
-          <span class="pl-summary-edit">Ändra</span>
-        </div>
-        <div class="pl-summary-divider"></div>
         <div class="pl-summary-item" @click="goToStep('calendar')">
           <div class="pl-summary-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -238,7 +177,6 @@ const resource = { id: 6, name: "PelviX-rum", type: "resource", resourceType: "r
       </div>
 
       <div class="pl-step-header">
-        <span class="pl-step-number">3</span>
         <h2 class="pl-step-title">Välj tid</h2>
       </div>
 
@@ -385,6 +323,16 @@ export default {
       title: 'Days ahead to show',
       type: Number,
       default: 90
+    },
+    introServiceName: {
+      title: 'Intro service name (for new customers)',
+      type: String,
+      default: 'PelviX första gången'
+    },
+    regularServiceName: {
+      title: 'Regular service name (for returning customers)',
+      type: String,
+      default: 'PelviX'
     }
   },
 
@@ -396,20 +344,21 @@ export default {
       loadingTimes: false,
       error: null,
 
-      // Steps: service -> calendar -> time
-      currentStep: 'service',
+      // Steps: question -> calendar -> time
+      currentStep: 'question',
+      flowResolved: false,
 
-      // Services - loaded from API with fallback
+      // Services - loaded from API
       availableServices: [],
       selectedService: null,
-      fullServiceData: [], // Store full service objects for checkout
+      fullServiceData: [],
 
       // Calendar state
       currentMonth: new Date(),
       calendarDates: [],
       selectedDate: null,
       weekdays: ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'],
-      availabilityByDate: {}, // Store available slots per date
+      availabilityByDate: {},
 
       // Time slots
       availableTimes: [],
@@ -443,14 +392,112 @@ export default {
       const currentMonthStart = new Date(this.currentMonth.getFullYear(), this.currentMonth.getMonth(), 1);
       const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
       return currentMonthStart > thisMonthStart;
+    },
+
+    introService() {
+      return this.availableServices.find(s => s.name === this.introServiceName) || this.availableServices[0];
+    },
+
+    regularService() {
+      // Find exact match for regular service. Avoid matching the intro service
+      // by ensuring we don't pick a service whose name contains "första"
+      return this.availableServices.find(s =>
+        s.name === this.regularServiceName
+      ) || this.availableServices.find(s =>
+        !s.name.toLowerCase().includes('första')
+      ) || this.availableServices[0];
+    }
+  },
+
+  watch: {
+    '$store.state.user': {
+      handler(user) {
+        // Only resolve flow if not already resolved (prevents mid-flow resets)
+        if (!this.flowResolved && this.availableServices.length > 0) {
+          this.resolveEntryFlow();
+        }
+      }
     }
   },
 
   async mounted() {
     await this.fetchServices();
+    this.resolveEntryFlow();
   },
 
   methods: {
+    // Determine the entry flow based on auth state and booking history
+    async resolveEntryFlow() {
+      if (this.flowResolved || this._resolving) return;
+      this._resolving = true;
+
+      const user = this.$store.state.user;
+
+      if (!user) {
+        // Not logged in: show the question
+        this.currentStep = 'question';
+        this.loading = false;
+        this._resolving = false;
+        return;
+      }
+
+      // Logged in: check booking history
+      this.loading = true;
+      this.loadingMessage = 'Kontrollerar din historik...';
+
+      try {
+        const bookings = await window.$zoeziapi.get('/api/memberapi/bookings/get');
+
+        // Guard: if flow was resolved while we were waiting, abort
+        if (this.flowResolved) {
+          this.loading = false;
+          this._resolving = false;
+          return;
+        }
+
+        const hasHistory = Array.isArray(bookings) && bookings.length > 0;
+
+        if (hasHistory) {
+          // Returning customer → regular PelviX
+          this.selectServiceAndShowCalendar(this.regularService);
+        } else {
+          // New customer → intro PelviX
+          this.selectServiceAndShowCalendar(this.introService);
+        }
+      } catch (err) {
+        console.error('Error checking booking history:', err);
+        // Fallback: show the question
+        this.currentStep = 'question';
+        this.loading = false;
+      } finally {
+        this._resolving = false;
+      }
+    },
+
+    // Select a service and transition to the calendar
+    selectServiceAndShowCalendar(service) {
+      if (!service) {
+        console.error('No service available to select');
+        this.error = 'Inga behandlingar tillgängliga just nu. Försök igen senare.';
+        this.loading = false;
+        return;
+      }
+      this.selectedService = service;
+      this.flowResolved = true;
+      this.currentStep = 'calendar';
+      this.loading = false;
+      this.loadCalendarAvailability();
+    },
+
+    // Handle the Ja/Nej question for non-logged-in users
+    answerQuestion(hasHistory) {
+      if (hasHistory) {
+        this.selectServiceAndShowCalendar(this.regularService);
+      } else {
+        this.selectServiceAndShowCalendar(this.introService);
+      }
+    },
+
     // Format date as YYYY-MM-DD
     formatDateISO(date) {
       const year = date.getFullYear();
@@ -494,13 +541,6 @@ export default {
       } finally {
         this.loading = false;
       }
-    },
-
-    // Service selection
-    selectService(service) {
-      this.selectedService = service;
-      this.currentStep = 'calendar';
-      this.loadCalendarAvailability();
     },
 
     // Load calendar availability using /api/public/resourcebooking/get
@@ -795,9 +835,7 @@ export default {
       console.log('Checkout complete:', result);
 
       // Validate that this is an actual successful booking, not just a cart clear
-      // The 'done' event is also emitted when clearing the cart, so we need to check
       if (!result) {
-        // No result data - likely a cart clear, not a successful booking
         this.resetSelection();
         return;
       }
@@ -807,7 +845,6 @@ export default {
       const hasOrderId = result.orderid || result.order_id;
 
       if (!hasOrderData && !hasOrderId) {
-        // No order data - likely a cart clear or cancelled checkout
         this.resetSelection();
         return;
       }
@@ -824,8 +861,6 @@ export default {
     },
 
     resetBooking() {
-      this.currentStep = 'service';
-      this.selectedService = null;
       this.selectedDate = null;
       this.selectedTime = null;
       this.availableTimes = [];
@@ -833,6 +868,10 @@ export default {
       this.orderDetails = null;
       this.showCheckoutSection = false;
       this.checkoutCompleted = false;
+
+      // Go back to calendar (service stays selected)
+      this.currentStep = 'calendar';
+      this.loadCalendarAvailability();
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -868,7 +907,7 @@ export default {
 ```css
 /* ========================================
    PELVIC LAB BOOKING COMPONENT
-   Premium Design: White, Gray, Gold
+   Elegant Design: White, Gold, Refined
    ======================================== */
 
 /* CSS Variables */
@@ -876,6 +915,7 @@ export default {
   --pl-gold: #C9A962;
   --pl-gold-light: #E8D5A8;
   --pl-gold-dark: #9A7B3A;
+  --pl-gold-glow: rgba(201, 169, 98, 0.12);
   --pl-white: #FFFFFF;
   --pl-gray-50: #FAFAFA;
   --pl-gray-100: #F5F5F5;
@@ -889,234 +929,137 @@ export default {
   --pl-gray-900: #212121;
   --pl-text: #1A1A1A;
   --pl-text-light: #666666;
-  --pl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --pl-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --pl-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --pl-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --pl-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --pl-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --pl-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --pl-shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.12);
   --pl-radius: 12px;
   --pl-radius-lg: 16px;
-  --pl-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --pl-transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Container */
 .pl-booking-container {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  max-width: 800px;
+  max-width: 540px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px;
   background: var(--pl-white);
   color: var(--pl-text);
   line-height: 1.6;
 }
 
-/* Hero Section */
-.pl-hero {
-  position: relative;
-  background: linear-gradient(135deg, var(--pl-gray-900) 0%, var(--pl-gray-800) 100%);
-  border-radius: var(--pl-radius-lg);
-  padding: 48px 32px;
-  margin-bottom: 32px;
-  overflow: hidden;
-}
-
-.pl-hero-content {
-  position: relative;
-  z-index: 1;
+/* Slim Header (replaces old hero) */
+.pl-header {
   text-align: center;
+  padding: 20px 0 16px;
+  margin-bottom: 8px;
 }
 
-.pl-hero-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, var(--pl-gold) 0%, var(--pl-gold-light) 100%);
-  color: var(--pl-gray-900);
-  font-size: 12px;
+.pl-header-label {
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  padding: 6px 16px;
-  border-radius: 20px;
-  margin-bottom: 16px;
+  letter-spacing: 2px;
+  color: var(--pl-gold);
+  margin-bottom: 6px;
 }
 
-.pl-hero-title {
-  font-size: 36px;
+.pl-header-title {
+  font-size: 26px;
   font-weight: 700;
-  color: var(--pl-white);
-  margin: 0 0 12px 0;
-  letter-spacing: -0.5px;
-}
-
-.pl-hero-subtitle {
-  font-size: 16px;
-  color: var(--pl-gray-400);
+  color: var(--pl-gray-900);
   margin: 0;
-  max-width: 400px;
-  margin: 0 auto;
+  letter-spacing: -0.3px;
 }
 
-.pl-hero-accent {
-  position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, var(--pl-gold) 0%, transparent 70%);
-  opacity: 0.1;
-  pointer-events: none;
+.pl-header-divider {
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--pl-gold-light), var(--pl-gold), var(--pl-gold-light));
+  margin: 14px auto 0;
+  border-radius: 1px;
+}
+
+/* Question Step */
+.pl-step-question {
+  padding: 16px 0;
+}
+
+.pl-question-card {
+  text-align: center;
+  padding: 40px 24px;
+  background: var(--pl-gray-50);
+  border-radius: var(--pl-radius-lg);
+  border: 1px solid var(--pl-gray-200);
+}
+
+.pl-question-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 20px;
+  background: var(--pl-gold-glow);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-question-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--pl-gold);
+}
+
+.pl-question-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--pl-gray-900);
+  margin: 0 0 8px 0;
+}
+
+.pl-question-text {
+  font-size: 15px;
+  color: var(--pl-gray-600);
+  margin: 0 0 28px 0;
+}
+
+.pl-question-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 /* Step Header */
 .pl-step-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.pl-step-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--pl-gold) 0%, var(--pl-gold-dark) 100%);
-  color: var(--pl-white);
-  font-size: 16px;
-  font-weight: 700;
-  border-radius: 50%;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .pl-step-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--pl-gray-900);
-  margin: 0;
-}
-
-/* Service Cards */
-.pl-services-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.pl-service-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background: var(--pl-white);
-  border: 2px solid var(--pl-gray-200);
-  border-radius: var(--pl-radius);
-  padding: 24px;
-  cursor: pointer;
-  transition: var(--pl-transition);
-  position: relative;
-}
-
-.pl-service-card:hover {
-  border-color: var(--pl-gold-light);
-  box-shadow: var(--pl-shadow);
-  transform: translateY(-2px);
-}
-
-.pl-service-card.pl-selected {
-  border-color: var(--pl-gold);
-  background: linear-gradient(135deg, rgba(201, 169, 98, 0.05) 0%, rgba(201, 169, 98, 0.1) 100%);
-  box-shadow: var(--pl-shadow-lg);
-}
-
-.pl-service-icon {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, var(--pl-gray-100) 0%, var(--pl-gray-200) 100%);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pl-service-card.pl-selected .pl-service-icon {
-  background: linear-gradient(135deg, var(--pl-gold-light) 0%, var(--pl-gold) 100%);
-}
-
-.pl-service-icon svg {
-  width: 28px;
-  height: 28px;
-  stroke: var(--pl-gray-600);
-}
-
-.pl-service-card.pl-selected .pl-service-icon svg {
-  stroke: var(--pl-white);
-}
-
-.pl-service-content {
-  flex: 1;
-}
-
-.pl-service-name {
   font-size: 18px;
   font-weight: 600;
   color: var(--pl-gray-900);
-  margin: 0 0 4px 0;
-}
-
-.pl-service-description {
-  font-size: 14px;
-  color: var(--pl-gray-600);
-  margin: 0 0 12px 0;
-}
-
-.pl-service-meta {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.pl-service-duration {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--pl-gray-500);
-}
-
-.pl-service-check {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  background: var(--pl-gray-200);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: var(--pl-transition);
-}
-
-.pl-service-card.pl-selected .pl-service-check {
-  opacity: 1;
-  background: var(--pl-gold);
-}
-
-.pl-service-check svg {
-  width: 18px;
-  height: 18px;
-  stroke: var(--pl-white);
+  margin: 0;
 }
 
 /* Selection Summary */
 .pl-selection-summary {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius);
-  padding: 16px;
-  margin-bottom: 24px;
+  padding: 12px;
+  margin-bottom: 16px;
 }
 
 .pl-summary-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px;
+  gap: 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;
   transition: var(--pl-transition);
@@ -1127,10 +1070,10 @@ export default {
 }
 
 .pl-summary-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   background: var(--pl-white);
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1138,8 +1081,8 @@ export default {
 }
 
 .pl-summary-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   stroke: var(--pl-gold);
 }
 
@@ -1150,41 +1093,35 @@ export default {
 }
 
 .pl-summary-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--pl-gray-500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .pl-summary-value {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--pl-gray-900);
 }
 
 .pl-summary-edit {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--pl-gold);
   font-weight: 500;
-}
-
-.pl-summary-divider {
-  height: 1px;
-  background: var(--pl-gray-200);
-  margin: 8px 0;
 }
 
 /* Calendar */
 .pl-calendar-wrapper {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius-lg);
-  padding: 24px;
+  padding: 16px;
 }
 
 .pl-calendar {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 20px;
+  padding: 16px;
   box-shadow: var(--pl-shadow-sm);
 }
 
@@ -1192,17 +1129,17 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--pl-gray-200);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pl-gray-100);
 }
 
 .pl-month-nav {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   background: var(--pl-white);
   border: 1px solid var(--pl-gray-200);
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1211,23 +1148,23 @@ export default {
 }
 
 .pl-month-nav:hover:not(:disabled) {
-  background: var(--pl-gray-100);
+  background: var(--pl-gray-50);
   border-color: var(--pl-gold);
 }
 
 .pl-month-nav:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .pl-month-nav svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   stroke: var(--pl-gray-700);
 }
 
 .pl-month-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--pl-gray-900);
   margin: 0;
@@ -1236,7 +1173,7 @@ export default {
 .pl-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 
 .pl-weekday {
@@ -1246,7 +1183,7 @@ export default {
   color: var(--pl-gray-500);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .pl-calendar-day {
@@ -1255,7 +1192,7 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: var(--pl-transition);
   position: relative;
@@ -1267,11 +1204,11 @@ export default {
 
 .pl-calendar-day.pl-disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 .pl-calendar-day.pl-available:hover {
-  background: var(--pl-gray-100);
+  background: var(--pl-gold-glow);
 }
 
 .pl-calendar-day.pl-selected {
@@ -1284,7 +1221,7 @@ export default {
 }
 
 .pl-day-number {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--pl-gray-700);
 }
@@ -1298,11 +1235,11 @@ export default {
 }
 
 .pl-day-dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   background: var(--pl-gold);
   border-radius: 50%;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .pl-calendar-day.pl-selected .pl-day-dot {
@@ -1313,22 +1250,22 @@ export default {
 .pl-calendar-legend {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  margin-top: 16px;
-  padding-top: 16px;
+  gap: 20px;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 
 .pl-legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
   color: var(--pl-gray-600);
 }
 
 .pl-legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
 
@@ -1343,15 +1280,15 @@ export default {
 /* Time Slots */
 .pl-times-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
 }
 
 .pl-time-slot {
   background: var(--pl-white);
-  border: 2px solid var(--pl-gray-200);
-  border-radius: 10px;
-  padding: 16px 12px;
+  border: 1.5px solid var(--pl-gray-200);
+  border-radius: 8px;
+  padding: 12px 8px;
   text-align: center;
   cursor: pointer;
   transition: var(--pl-transition);
@@ -1364,11 +1301,11 @@ export default {
 
 .pl-time-slot.pl-selected {
   border-color: var(--pl-gold);
-  background: linear-gradient(135deg, rgba(201, 169, 98, 0.1) 0%, rgba(201, 169, 98, 0.15) 100%);
+  background: var(--pl-gold-glow);
 }
 
 .pl-time-value {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--pl-gray-900);
 }
@@ -1380,15 +1317,15 @@ export default {
 /* No Times */
 .pl-no-times {
   text-align: center;
-  padding: 48px 24px;
+  padding: 36px 20px;
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius);
 }
 
 .pl-no-times-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
 }
 
 .pl-no-times-icon svg {
@@ -1399,14 +1336,15 @@ export default {
 
 .pl-no-times p {
   color: var(--pl-gray-600);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
 }
 
 /* Continue Section */
 .pl-continue-section {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid var(--pl-gray-200);
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pl-gray-100);
   text-align: center;
 }
 
@@ -1416,8 +1354,8 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 14px 28px;
-  font-size: 15px;
+  padding: 12px 24px;
+  font-size: 14px;
   font-weight: 600;
   border-radius: 10px;
   cursor: pointer;
@@ -1433,14 +1371,14 @@ export default {
 }
 
 .pl-button-primary:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--pl-shadow-lg);
 }
 
 .pl-button-secondary {
   background: var(--pl-white);
   color: var(--pl-gray-700);
-  border: 2px solid var(--pl-gray-200);
+  border: 1.5px solid var(--pl-gray-200);
 }
 
 .pl-button-secondary:hover {
@@ -1448,49 +1386,41 @@ export default {
   color: var(--pl-gold-dark);
 }
 
+.pl-button-outline {
+  background: var(--pl-white);
+  color: var(--pl-gray-700);
+  border: 1.5px solid var(--pl-gray-200);
+}
+
+.pl-button-outline:hover {
+  border-color: var(--pl-gold-light);
+  color: var(--pl-gray-900);
+  background: var(--pl-gray-50);
+}
+
 .pl-button-large {
-  padding: 18px 36px;
-  font-size: 16px;
+  padding: 14px 32px;
+  font-size: 15px;
 }
 
 /* Back Button */
-.pl-back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: var(--pl-gray-600);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: var(--pl-transition);
-}
-
-.pl-back-button:hover {
-  background: var(--pl-gray-100);
-  color: var(--pl-gray-900);
-}
-
 .pl-back-button-large {
   display: block;
   width: fit-content;
-  margin: 24px auto 0;
-  padding: 12px 24px;
-  background: var(--pl-gray-100);
-  border: none;
+  margin: 20px auto 0;
+  padding: 10px 20px;
+  background: var(--pl-gray-50);
+  border: 1px solid var(--pl-gray-200);
   border-radius: 8px;
-  color: var(--pl-gray-700);
-  font-size: 14px;
+  color: var(--pl-gray-600);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: var(--pl-transition);
 }
 
 .pl-back-button-large:hover {
-  background: var(--pl-gray-200);
+  background: var(--pl-gray-100);
   color: var(--pl-gray-900);
 }
 
@@ -1513,30 +1443,40 @@ export default {
 }
 
 .pl-spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--pl-gray-200);
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--pl-gray-200);
   border-top-color: var(--pl-gold);
   border-radius: 50%;
-  animation: pl-spin 1s linear infinite;
-  margin: 0 auto 16px;
+  animation: pl-spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+.pl-loading p {
+  font-size: 14px;
+  color: var(--pl-gray-600);
 }
 
 .pl-loading-inline {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 24px;
+  padding: 36px 20px;
 }
 
 .pl-spinner-small {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 2px solid var(--pl-gray-200);
   border-top-color: var(--pl-gold);
   border-radius: 50%;
-  animation: pl-spin 1s linear infinite;
-  margin-bottom: 12px;
+  animation: pl-spin 0.8s linear infinite;
+  margin-bottom: 10px;
+}
+
+.pl-loading-inline p {
+  font-size: 14px;
+  color: var(--pl-gray-600);
 }
 
 @keyframes pl-spin {
@@ -1546,15 +1486,15 @@ export default {
 /* Error State */
 .pl-error {
   text-align: center;
-  padding: 48px 24px;
+  padding: 36px 20px;
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius);
 }
 
 .pl-error-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
 }
 
 .pl-error-icon svg {
@@ -1565,23 +1505,24 @@ export default {
 
 .pl-error p {
   color: var(--pl-gray-600);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
 }
 
 /* Checkout Section (Inline) */
 .pl-checkout-section {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius-lg);
-  padding: 32px 24px;
-  margin-top: 24px;
+  padding: 24px 20px;
+  margin-top: 16px;
 }
 
 .pl-checkout-header {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .pl-checkout-header h2 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--pl-gray-900);
   margin: 0;
@@ -1590,24 +1531,24 @@ export default {
 .pl-checkout-summary {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 20px 24px;
-  margin-bottom: 24px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
 }
 
 .pl-checkout-summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0;
 }
 
 .pl-checkout-label {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--pl-gray-600);
 }
 
 .pl-checkout-value {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--pl-gray-900);
 }
@@ -1615,7 +1556,7 @@ export default {
 .pl-checkout-content {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 24px;
+  padding: 20px;
 }
 
 /* Confirmation Modal */
@@ -1625,83 +1566,84 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 24px;
+  padding: 20px;
 }
 
 .pl-confirmation-modal {
   background: var(--pl-white);
   border-radius: var(--pl-radius-lg);
-  padding: 48px 40px;
-  max-width: 480px;
+  padding: 40px 32px;
+  max-width: 440px;
   width: 100%;
   text-align: center;
   box-shadow: var(--pl-shadow-xl);
 }
 
 .pl-confirmation-icon {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, rgba(201, 169, 98, 0.1) 0%, rgba(201, 169, 98, 0.2) 100%);
+  width: 64px;
+  height: 64px;
+  background: var(--pl-gold-glow);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 24px;
+  margin: 0 auto 20px;
 }
 
 .pl-confirmation-icon svg {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   stroke: var(--pl-gold);
 }
 
 .pl-confirmation-title {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--pl-gray-900);
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
 }
 
 .pl-confirmation-message {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--pl-gray-600);
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
 }
 
 .pl-confirmation-details {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius);
-  padding: 20px;
-  margin-bottom: 24px;
+  padding: 16px;
+  margin-bottom: 20px;
 }
 
 .pl-confirmation-details h3 {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--pl-gray-500);
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .pl-confirmation-details p {
-  margin: 4px 0;
+  margin: 3px 0;
   color: var(--pl-gray-800);
+  font-size: 14px;
 }
 
 .pl-confirmation-info {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  background: linear-gradient(135deg, rgba(201, 169, 98, 0.05) 0%, rgba(201, 169, 98, 0.1) 100%);
+  gap: 10px;
+  background: var(--pl-gold-glow);
   border-radius: var(--pl-radius);
-  padding: 16px;
-  margin-bottom: 24px;
+  padding: 14px;
+  margin-bottom: 20px;
   text-align: left;
 }
 
@@ -1715,44 +1657,32 @@ export default {
 
 .pl-confirmation-info p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--pl-gray-700);
 }
 
 .pl-confirmation-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: center;
 }
 
 /* Mobile Responsive */
 @media (max-width: 640px) {
   .pl-booking-container {
-    padding: 16px;
+    padding: 12px;
   }
 
-  .pl-hero {
-    padding: 32px 20px;
+  .pl-header-title {
+    font-size: 22px;
   }
 
-  .pl-hero-title {
-    font-size: 28px;
+  .pl-question-card {
+    padding: 28px 16px;
   }
 
-  .pl-service-card {
-    flex-direction: column;
-    text-align: center;
-    padding: 20px;
-  }
-
-  .pl-service-check {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-  }
-
-  .pl-service-card.pl-selected .pl-service-check {
-    opacity: 1;
+  .pl-question-title {
+    font-size: 20px;
   }
 
   .pl-times-grid {
@@ -1760,7 +1690,7 @@ export default {
   }
 
   .pl-confirmation-modal {
-    padding: 32px 24px;
+    padding: 28px 20px;
   }
 
   .pl-confirmation-actions {
@@ -1793,6 +1723,11 @@ export default {
 GET /api/public/resourcebooking/service/get
 ```
 
+### Check Booking History (logged-in users)
+```
+GET /api/memberapi/bookings/get
+```
+
 ### Fetch Available Slots (for calendar and time selection)
 ```
 GET /api/public/resourcebooking/get
@@ -1806,10 +1741,31 @@ POST /api/resource/reservation/add_resourcebooking
 
 ---
 
+## Flow Logic
+
+### Logged-in user with booking history
+Services fetch → booking history check → auto-select "PelviX" → calendar
+
+### Logged-in user without booking history
+Services fetch → booking history check (empty) → auto-select "PelviX första gången" → calendar
+
+### Not logged in
+Services fetch → show question "Har du gjort behandling hos oss tidigare?" → Ja/Nej → auto-select service → calendar
+
+### Error fallback
+If booking history API fails → show question (same as not logged in)
+
+---
+
 ## Testing Checklist
 
-- [ ] Service selection works correctly
-- [ ] Calendar shows available dates (dates with available slots)
+- [ ] Logged-in user with past bookings → auto-selects PelviX, shows calendar
+- [ ] Logged-in user without bookings → auto-selects PelviX första gången, shows calendar
+- [ ] Not logged in → shows question with Ja/Nej
+- [ ] Ja answer → selects PelviX, shows calendar
+- [ ] Nej answer → selects PelviX första gången, shows calendar
+- [ ] Header shows correct service name
+- [ ] Calendar shows available dates
 - [ ] Month navigation works
 - [ ] Time slots load for selected date
 - [ ] Checkout section shows inline (not modal)
@@ -1817,20 +1773,16 @@ POST /api/resource/reservation/add_resourcebooking
 - [ ] Confirmation modal displays
 - [ ] Mobile responsive design
 - [ ] Loading states display properly
-- [ ] Error handling works
+- [ ] Error handling works (API failure falls back to question)
 
 ---
 
-## Summary
+## Props Configuration
 
-This component provides a premium booking experience for Pelvic Lab's PelviX treatments with:
-- Elegant white/gray/gold color scheme
-- Step-by-step booking flow
-- Interactive calendar showing dates with availability
-- Inline Zoezi checkout (not a modal)
-- Proper reservation flow before checkout
-- Mobile-responsive design
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| daysAhead | Number | 90 | Days ahead to show in calendar |
+| introServiceName | String | "PelviX första gången" | Name of intro service (matched from API) |
+| regularServiceName | String | "PelviX" | Name of regular service (matched from API) |
 
 ---
-
-*Last updated: 2026-01-22*
