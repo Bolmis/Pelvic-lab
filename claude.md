@@ -1,33 +1,77 @@
-# Claude Code Instructions for Zoezi Component Development
-
-This file contains instructions for AI assistants working on Zoezi gym membership platform components.
-
----
+# Pelvic Lab — Project Instructions
 
 ## What This Repository Is
 
-> **This is a REFERENCE REPOSITORY for AI context.**
->
-> The Zoezi framework files here (`components/`, `main.js`, `router.js`, `dateextensions.js`) are **read-only reference material**. You study them to understand how Zoezi works, then create NEW integrated apps and components.
+This is the **Pelvic Lab** project — a system for controlling the PelviX (Pelvipower) treatment chair via Zoezi components and a Node.js backend on Replit.
 
-### Reference Files (DO NOT MODIFY)
+- **Backend:** `server.js` on Replit → `https://pelvic-lab-zoezi.replit.app`
+- **Zoezi domain:** `pelviclab.zoezi.se`
+- **Device API:** Pelvipower ThirdParty Middleware (see `pelvic-api-docs.md`)
 
-| File/Folder | Contains |
-|-------------|----------|
-| `components/` | Zoezi framework Vue components |
-| `main.js` | App initialization, plugin registration, services |
-| `router.js` | Vue Router configuration and route handling |
-| `dateextensions.js` | Date prototype extensions and utilities |
+## Repository Structure
 
-### Files You CREATE or MODIFY
+| File | Purpose |
+|------|---------|
+| `server.js` | Express backend — auth, device control, webhooks, auto-lock |
+| `pelvic-api-docs.md` | Pelvipower API reference (unlock, abort, webhooks, events) |
+| `zoezi-halsodeklaration-COMPLETE.md` | Health declaration form component (Fillout embed) |
+| `zoezi-pelvix-starter-COMPLETE.md` | PelviX chair start flow component |
+| `pelviclab-webshop-component.md` | Product webshop with configurable props |
+| `pelviclab-booking-component.md` | Booking component |
+| `pelvic-lab-info.md` | Customer-facing information |
 
-| File/Folder | Purpose |
-|-------------|---------|
-| `Fysiken/` | Custom components for Fysiken gym chain |
-| `Centralbadet/` | Custom components for Centralbadet |
-| `Pelvic Lab/` | Custom components for Pelvic Lab |
-| `Sturebadet/` | Custom components for Sturebadet |
-| `[NewBrand]/` | Create new folders for new brand integrations |
+## Key Architecture
+
+### PelviX Session Flow
+1. User must complete hälsodeklaration (Fillout form → webhook → `xf.halsodeklaration = true`)
+2. User must have an active Zoezi resource booking (checked server-side)
+3. Server calls `POST /command/unlock` on Pelvipower API
+4. Server schedules `POST /command/abort` when booking ends (auto-lock)
+5. Back-to-back bookings are detected — timer extends instead of aborting
+
+### Auto-Lock System (`server.js`)
+- `abortDevice(reason)` — calls `POST /command/abort`
+- `abortDeviceWithRetry(reason)` — 3 retries with backoff, email alert on failure
+- `scheduleSessionAbort(txnId, bookingEnd, ...)` — setTimeout + session state tracking
+- `clearSession(txnId, reason)` — clears timer on natural session end
+- Safety sweep every 30s catches expired sessions
+- Startup safety lock on server boot
+- Back-to-back booking detection before aborting
+- Duplicate start guard (`startInFlight` Set)
+
+### Component Polling (no page reload needed)
+- **Hälsodeklaration** polls every 15s: checks for new bookings AND completion status
+- **PelviX Starter** polls every 15s: checks hälsodeklaration status AND bookings
+- Flow: form appears → user submits → form disappears → start button appears
+
+### Webhooks
+- `POST /api/webhook/fillout-halsodeklaration?secret=X` — Fillout form submission, sets `xf.halsodeklaration = true`
+- `POST /api/webhook/pelvic` — Pelvipower device events, payload has `entries[]` array with `transactionId` at top level
+
+## Zoezi API Patterns (IMPORTANT — easy to get wrong)
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /api/user/get?id=X` | Query param, NOT path param. Staff API, returns xf fields |
+| `POST /api/member/change` | NOT `/api/user/change`. For updating user fields |
+| `/api/memberapi/get/current` | Member API — does NOT return xf fields |
+| `/api/memberapi/bookings/get` | Member API for bookings (used by frontend components) |
+| `/api/resourcebooking/get/booked` | Staff API for booking verification (used by server) |
+
+**XF merge pattern:** Always GET user first → spread existing `user.xf` → add new field → POST full merged xf object. Never overwrite the entire xf.
+
+## Component Deployment
+
+Components are **COMPLETE.md documentation files**. To deploy changes:
+1. Edit the COMPLETE.md file in this repo
+2. Copy-paste the updated HTML/JS/CSS into the **Zoezi page builder**
+3. Components are NOT auto-deployed — manual copy-paste required
+
+---
+
+# Zoezi Component Development Guide
+
+The sections below are generic Zoezi component development instructions.
 
 ---
 
