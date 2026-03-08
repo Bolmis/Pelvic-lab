@@ -1617,16 +1617,16 @@ export default {
 .pl-checkout-section {
   background: var(--pl-gray-50);
   border-radius: var(--pl-radius-lg);
-  padding: 20px 16px;
+  padding: 16px 12px;
   margin-top: 16px;
 }
 
 .pl-checkout-header {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .pl-checkout-header h2 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--pl-gray-900);
   margin: 0;
@@ -1635,15 +1635,15 @@ export default {
 .pl-checkout-summary {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 12px 16px;
-  margin-bottom: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
 }
 
 .pl-checkout-summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 0;
+  padding: 3px 0;
 }
 
 .pl-checkout-label {
@@ -1660,7 +1660,187 @@ export default {
 .pl-checkout-content {
   background: var(--pl-white);
   border-radius: var(--pl-radius);
-  padding: 16px;
+  padding: 8px;
+}
+
+/* === Zoezi Checkout Internal Overrides === */
+/* Scale down all internal text, inputs, buttons to fit slim container */
+
+.pl-checkout-content .zoezi-checkout {
+  font-size: 13px !important;
+}
+
+/* Reduce Vuetify card padding */
+.pl-checkout-content .v-card {
+  padding: 8px !important;
+  box-shadow: none !important;
+}
+
+.pl-checkout-content .v-card__text {
+  padding: 8px !important;
+  font-size: 13px !important;
+}
+
+.pl-checkout-content .v-card__title {
+  font-size: 15px !important;
+  padding: 8px !important;
+}
+
+.pl-checkout-content .v-card__actions {
+  padding: 8px !important;
+}
+
+/* Compact input fields */
+.pl-checkout-content .v-input {
+  font-size: 13px !important;
+}
+
+.pl-checkout-content .v-input__slot {
+  min-height: 36px !important;
+}
+
+.pl-checkout-content .v-text-field input {
+  font-size: 13px !important;
+  padding: 4px 0 !important;
+}
+
+.pl-checkout-content .v-label {
+  font-size: 13px !important;
+}
+
+.pl-checkout-content .v-select__selection {
+  font-size: 13px !important;
+}
+
+.pl-checkout-content .v-messages {
+  font-size: 11px !important;
+  min-height: 16px !important;
+}
+
+/* Compact buttons */
+.pl-checkout-content .v-btn {
+  font-size: 13px !important;
+  height: 38px !important;
+  min-width: auto !important;
+  padding: 0 16px !important;
+}
+
+.pl-checkout-content .v-btn--large,
+.pl-checkout-content .v-btn--x-large {
+  height: 40px !important;
+  font-size: 14px !important;
+}
+
+/* Compact stepper if present */
+.pl-checkout-content .v-stepper__header {
+  height: auto !important;
+  box-shadow: none !important;
+}
+
+.pl-checkout-content .v-stepper__step {
+  padding: 8px 12px !important;
+}
+
+.pl-checkout-content .v-stepper__label {
+  font-size: 12px !important;
+}
+
+.pl-checkout-content .v-stepper__content {
+  padding: 8px 12px !important;
+}
+
+/* Fix grid columns to stack on slim container */
+.pl-checkout-content .col-md-6,
+.pl-checkout-content .col-md-4,
+.pl-checkout-content .col-md-8 {
+  flex: 0 0 100% !important;
+  max-width: 100% !important;
+}
+
+.pl-checkout-content .col-12,
+.pl-checkout-content .col {
+  padding: 4px 8px !important;
+}
+
+.pl-checkout-content .row {
+  margin: 0 -8px !important;
+}
+
+/* Reduce spacing in checkout content */
+.pl-checkout-content .pa-4,
+.pl-checkout-content .pa-3 {
+  padding: 8px !important;
+}
+
+.pl-checkout-content .mb-4,
+.pl-checkout-content .mb-3 {
+  margin-bottom: 8px !important;
+}
+
+.pl-checkout-content .mt-4,
+.pl-checkout-content .mt-3 {
+  margin-top: 8px !important;
+}
+
+/* Reduce heading sizes inside checkout */
+.pl-checkout-content h1,
+.pl-checkout-content h2,
+.pl-checkout-content h3 {
+  font-size: 15px !important;
+  margin-bottom: 6px !important;
+}
+
+.pl-checkout-content h4,
+.pl-checkout-content h5,
+.pl-checkout-content h6 {
+  font-size: 13px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Compact list items */
+.pl-checkout-content .v-list-item {
+  min-height: 36px !important;
+  padding: 0 8px !important;
+}
+
+.pl-checkout-content .v-list-item__content {
+  padding: 6px 0 !important;
+}
+
+.pl-checkout-content .v-list-item__title {
+  font-size: 13px !important;
+}
+
+.pl-checkout-content .v-list-item__subtitle {
+  font-size: 12px !important;
+}
+
+/* Compact dividers and spacing */
+.pl-checkout-content .v-divider {
+  margin: 6px 0 !important;
+}
+
+/* Compact expansion panels */
+.pl-checkout-content .v-expansion-panel-header {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  min-height: 36px !important;
+}
+
+.pl-checkout-content .v-expansion-panel-content__wrap {
+  padding: 8px 12px !important;
+}
+
+/* Force text wrapping */
+.pl-checkout-content * {
+  word-break: break-word;
+}
+
+/* Override any max-width that might cause overflow */
+.pl-checkout-content .zoezi-checkout,
+.pl-checkout-content .zoezi-checkout > * {
+  max-width: 100% !important;
+  overflow: hidden;
 }
 
 /* Confirmation Modal */
