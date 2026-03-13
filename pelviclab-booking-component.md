@@ -332,6 +332,13 @@
         <p>{{ formatDateDisplay(selectedDate) }} kl {{ formatTime(selectedTime.start) }}</p>
       </div>
 
+      <div class="pl-confirmation-info pl-confirmation-location">
+        <div class="pl-info-icon">
+          <span class="pl-location-emoji">📍</span>
+        </div>
+        <p>Move Wellness på Vadavägen 3, 186 70 Brottby</p>
+      </div>
+
       <div class="pl-confirmation-info">
         <div class="pl-info-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -2165,6 +2172,21 @@ a.pl-button-secondary:active {
   margin: 0;
   font-size: 13px;
   color: var(--pl-gray-700);
+}
+
+.pl-confirmation-location {
+  background: var(--pl-gray-50, #FAFAFA);
+  border: 1px solid var(--pl-gray-200, #EEEEEE);
+}
+
+.pl-confirmation-location p {
+  font-weight: 600;
+  color: var(--pl-gray-800) !important;
+}
+
+.pl-location-emoji {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .pl-confirmation-actions {

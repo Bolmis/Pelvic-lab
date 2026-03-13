@@ -60,6 +60,7 @@ The backend (Replit) needs these environment variables:
         <div class="pxs-hero-badge">Bäckenbottenträning</div>
         <h1 class="pxs-hero-title">PelviX</h1>
         <p class="pxs-hero-subtitle">Välkommen, {{ userName }}!</p>
+        <p class="pxs-hero-location">📍 Move Wellness — Vadavägen 3, Brottby</p>
       </div>
       <div class="pxs-hero-decoration"></div>
     </div>
@@ -110,6 +111,7 @@ The backend (Replit) needs these environment variables:
         <div class="pxs-hero-badge">Bäckenbottenträning</div>
         <h1 class="pxs-hero-title">Starta PelviX</h1>
         <p class="pxs-hero-subtitle">Välkommen, {{ userName }}!</p>
+        <p class="pxs-hero-location">📍 Move Wellness — Vadavägen 3, Brottby</p>
       </div>
       <div class="pxs-hero-decoration"></div>
     </div>
@@ -672,6 +674,13 @@ export default {
   font-size: 16px;
   color: var(--pxs-gray-400);
   margin: 0;
+}
+
+.zoezi-pelvix-starter .pxs-hero-location {
+  font-size: 13px;
+  color: var(--pxs-gray-500);
+  margin: 12px 0 0 0;
+  letter-spacing: 0.3px;
 }
 
 .zoezi-pelvix-starter .pxs-hero-decoration {

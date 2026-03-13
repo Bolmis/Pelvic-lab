@@ -88,6 +88,7 @@ try {
         <div class="hd-hero-badge">Obligatoriskt</div>
         <h1 class="hd-hero-title">Hälsodeklaration</h1>
         <p class="hd-hero-subtitle">Fyll i formuläret nedan innan du kan starta din PelviX-behandling</p>
+        <p class="hd-hero-location">📍 Move Wellness — Vadavägen 3, Brottby</p>
       </div>
       <div class="hd-hero-decoration"></div>
     </div>
@@ -423,6 +424,13 @@ export default {
   max-width: 400px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.zoezi-halsodeklaration .hd-hero-location {
+  font-size: 13px;
+  color: var(--hd-gray-500);
+  margin: 12px 0 0 0;
+  letter-spacing: 0.3px;
 }
 
 .zoezi-halsodeklaration .hd-hero-decoration {
