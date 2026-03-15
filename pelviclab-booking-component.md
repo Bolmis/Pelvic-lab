@@ -419,7 +419,7 @@ export default {
       default: '/erbjudanden'
     },
     introProductId: {
-      title: 'Product ID for intro/provträning clip card',
+      title: 'Cardtype ID for intro/prova-på card (from Zoezi)',
       type: Number,
       default: 0
     }
@@ -682,9 +682,12 @@ export default {
           console.log('PelviX Booking: Looking for introProductId:', this.introProductId);
 
           if (Array.isArray(cards)) {
-            // Use loose comparison (==) to handle string/number type mismatches from API
+            // Match by cardtype_id (primary) or product_id (fallback), type-safe
+            const pid = String(this.introProductId);
             const introCards = cards.filter(card =>
-              String(card.product_id) === String(this.introProductId)
+              String(card.cardtype_id) === pid ||
+              String(card.cardtype && card.cardtype.id) === pid ||
+              String(card.product_id) === pid
             );
             console.log('PelviX Booking: Matching intro cards found:', introCards.length, introCards);
 
