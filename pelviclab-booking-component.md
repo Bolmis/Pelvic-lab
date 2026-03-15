@@ -664,7 +664,7 @@ export default {
 
     // Handle intro flow: check if user has intro card, show checkout if not
     async handleIntroFlow() {
-      // No intro product configured → go straight to calendar
+      // No intro product configured → go straight to intro calendar
       if (!this.introProductId) {
         this.selectServiceAndShowCalendar(this.introService);
         return;
@@ -678,8 +678,16 @@ export default {
       if (user) {
         try {
           const cards = await this.$api.get('/api/memberapi/trainingcard/get/all');
+          console.log('PelviX Booking: All training cards:', cards);
+          console.log('PelviX Booking: Looking for introProductId:', this.introProductId);
+
           if (Array.isArray(cards)) {
-            const introCards = cards.filter(card => card.product_id === this.introProductId);
+            // Use loose comparison (==) to handle string/number type mismatches from API
+            const introCards = cards.filter(card =>
+              String(card.product_id) === String(this.introProductId)
+            );
+            console.log('PelviX Booking: Matching intro cards found:', introCards.length, introCards);
+
             hasEverHadIntroCard = introCards.length > 0;
             hasActiveIntroCard = introCards.some(card => {
               if (!card.paid) return false;
@@ -692,13 +700,15 @@ export default {
         }
       }
 
-      if (hasEverHadIntroCard && !hasActiveIntroCard) {
-        // Had intro card before but used it → regular PelviX
-        this.selectServiceAndShowCalendar(this.regularService);
-      } else if (hasActiveIntroCard) {
-        // Has active intro card → intro calendar
+      console.log('PelviX Booking: hasEverHadIntroCard =', hasEverHadIntroCard, ', hasActiveIntroCard =', hasActiveIntroCard);
+
+      if (hasActiveIntroCard) {
+        // Has active intro card → show "PelviX första gången" calendar
         this.hasIntroCard = true;
         this.selectServiceAndShowCalendar(this.introService);
+      } else if (hasEverHadIntroCard) {
+        // Had intro card before but used it up → regular PelviX
+        this.selectServiceAndShowCalendar(this.regularService);
       } else {
         // Never had intro card → buy it first
         this.selectedService = this.introService;
