@@ -817,7 +817,14 @@ export default {
         const response = await window.$zoeziapi.get('/api/public/resourcebooking/service/get');
 
         let services = Array.isArray(response) ? response : [response];
-        services = services.filter(service => service.active && service.show);
+        // Keep active+visible services, but always include configured service IDs
+        const introId = this.introServiceId;
+        const regularId = this.regularServiceId;
+        services = services.filter(service =>
+          (service.active && service.show) ||
+          (introId && service.id === introId) ||
+          (regularId && service.id === regularId)
+        );
 
         // Store full service data for checkout
         this.fullServiceData = services;
