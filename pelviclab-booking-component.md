@@ -388,13 +388,28 @@ export default {
       type: Number,
       default: 90
     },
+    siteId: {
+      title: 'Zoezi Site ID',
+      type: Number,
+      default: 1
+    },
+    introServiceId: {
+      title: 'Intro service ID (Zoezi resource booking service)',
+      type: Number,
+      default: 0
+    },
     introServiceName: {
-      title: 'Intro service name (for new customers)',
+      title: 'Intro service name (fallback if ID not set)',
       type: String,
       default: 'PelviX första gången'
     },
+    regularServiceId: {
+      title: 'Regular service ID (Zoezi resource booking service)',
+      type: Number,
+      default: 0
+    },
     regularServiceName: {
-      title: 'Regular service name (for returning customers)',
+      title: 'Regular service name (fallback if ID not set)',
       type: String,
       default: 'PelviX'
     },
@@ -479,17 +494,35 @@ export default {
     },
 
     introService() {
+      // Match by ID first (most reliable), then by name
+      if (this.introServiceId) {
+        const byId = this.availableServices.find(s => s.id === this.introServiceId);
+        if (byId) return byId;
+        console.warn('PelviX Booking: introServiceId', this.introServiceId, 'not found in available services');
+      }
       return this.availableServices.find(s => s.name === this.introServiceName) || this.availableServices[0];
     },
 
     regularService() {
-      // Find exact match for regular service. Avoid matching the intro service
-      // by ensuring we don't pick a service whose name contains "första"
+      // Match by ID first (most reliable), then by name
+      if (this.regularServiceId) {
+        const byId = this.availableServices.find(s => s.id === this.regularServiceId);
+        if (byId) return byId;
+        console.warn('PelviX Booking: regularServiceId', this.regularServiceId, 'not found in available services');
+      }
       return this.availableServices.find(s =>
         s.name === this.regularServiceName
       ) || this.availableServices.find(s =>
         !s.name.toLowerCase().includes('första')
       ) || this.availableServices[0];
+    },
+
+    // IDs of the resolved PelviX services (used for filtering booking history)
+    pelvixServiceIds() {
+      const ids = [];
+      if (this.introService) ids.push(this.introService.id);
+      if (this.regularService) ids.push(this.regularService.id);
+      return ids;
     }
   },
 
@@ -546,18 +579,35 @@ export default {
         }
 
         // Response format: { resourcebookings: [{ bookings: [...] }], ... }
-        let hasHistory = false;
+        // Filter history to only count PelviX-specific non-cancelled bookings
+        let hasPelvixHistory = false;
         if (result && Array.isArray(result.resourcebookings)) {
-          hasHistory = result.resourcebookings.some(rb =>
-            Array.isArray(rb.bookings) && rb.bookings.length > 0
-          );
+          const pelvixIds = this.pelvixServiceIds;
+          const introName = (this.introServiceName || '').toLowerCase();
+          const regularName = (this.regularServiceName || '').toLowerCase();
+
+          hasPelvixHistory = result.resourcebookings.some(rb => {
+            // Match category by service_id or by name
+            const categoryId = rb.service_id || rb.id;
+            const categoryName = (rb.name || rb.serviceName || '').toLowerCase();
+            const matchesId = pelvixIds.length > 0 && pelvixIds.includes(categoryId);
+            const matchesName = (introName && categoryName.includes(introName)) ||
+                                (regularName && categoryName.includes(regularName)) ||
+                                categoryName.includes('pelvix');
+            if (!matchesId && !matchesName) return false;
+
+            // Only count non-cancelled bookings
+            return Array.isArray(rb.bookings) && rb.bookings.some(b => !b.cancelled);
+          });
         }
 
-        if (hasHistory) {
-          // Returning customer → regular PelviX
+        console.log('PelviX Booking: hasPelvixHistory =', hasPelvixHistory);
+
+        if (hasPelvixHistory) {
+          // Returning PelviX customer → regular service
           this.selectServiceAndShowCalendar(this.regularService);
         } else {
-          // New customer → check if they need to buy intro card first
+          // New PelviX customer → check intro card flow
           await this.handleIntroFlow();
         }
       } catch (err) {
@@ -657,7 +707,7 @@ export default {
           product_id: this.introProductId,
           count: 1,
           users: user ? [user.id || user.userId] : [],
-          site_id: 1
+          site_id: this.siteId
         }];
         this.showIntroCheckout = true;
         this.loading = false;
@@ -771,10 +821,10 @@ export default {
 
       } catch (err) {
         console.error('Error fetching services:', err);
-        // Fallback to hardcoded services
+        // Fallback services using configured names/IDs
         this.availableServices = [
-          { id: 1, name: "PelviX första gången", duration: 30, description: "Introduktionsbehandling för nya kunder", staffs: [{ id: 6 }] },
-          { id: 2, name: "PelviX", duration: 30, description: "Ordinarie PelviX-behandling", staffs: [{ id: 6 }] }
+          { id: this.introServiceId || 1, name: this.introServiceName, duration: 30, description: "Introduktionsbehandling för nya kunder", staffs: [] },
+          { id: this.regularServiceId || 2, name: this.regularServiceName, duration: 30, description: "Ordinarie PelviX-behandling", staffs: [] }
         ];
         this.fullServiceData = this.availableServices;
       } finally {
@@ -977,7 +1027,7 @@ export default {
           end: formatDateTime(this.selectedTime.end),
           rbservice_id: this.selectedService.id,
           staff_id: this.selectedTime.staffId,
-          site_id: 1,
+          site_id: this.siteId,
           reserving: true,
           optional_resources: [],
           count: 1
@@ -1007,7 +1057,7 @@ export default {
           end: this.selectedTime.end,
           staff_id: this.selectedTime.staffId,
           rbservice_id: this.selectedService.id,
-          site_id: 1,
+          site_id: this.siteId,
           optional_resources: [],
           count: 1
         };
@@ -1024,7 +1074,7 @@ export default {
             description: fullService.description,
             extendedInfo: fullService.extendedInfo || [],
             staffs: fullService.staffs,
-            sites: fullService.sites || [1],
+            sites: fullService.sites || [this.siteId],
             vat: fullService.vat,
             methods: fullService.methods || []
           },
@@ -1035,7 +1085,7 @@ export default {
           extended_info_list: [{}],
           context: null,
           tmp_id: bookingTmpId,
-          site_id: 1
+          site_id: this.siteId
         }];
 
         console.log('Checkout items created:', this.checkoutItems);

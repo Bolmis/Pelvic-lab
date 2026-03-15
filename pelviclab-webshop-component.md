@@ -449,12 +449,16 @@ export default {
       title: 'VIP Gold - Price (kr/mån)',
       type: Number,
       default: 1495
+    },
+    siteId: {
+      title: 'Zoezi Site ID',
+      type: Number,
+      default: 1
     }
   },
 
   data() {
     return {
-      siteId: 1,
       checkoutLoading: false,
 
       // Selection

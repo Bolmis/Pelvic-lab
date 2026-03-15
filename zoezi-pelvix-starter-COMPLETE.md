@@ -78,7 +78,7 @@ The backend (Replit) needs these environment variables:
         Köp ett klippkort eller medlemskap, eller boka en tid.
       </p>
 
-      <a href="/shoppa" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
+      <a :href="shopUrl" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
         <span class="pxs-btn-content">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
@@ -89,7 +89,7 @@ The backend (Replit) needs these environment variables:
         </span>
       </a>
 
-      <a href="/boka" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
+      <a :href="bookUrl" class="pxs-secondary-button" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">
         <span class="pxs-btn-content">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -274,6 +274,16 @@ export default {
       title: 'Minutes before booking to allow start',
       type: Number,
       default: 5
+    },
+    shopUrl: {
+      title: 'Webshop page URL',
+      type: String,
+      default: '/shoppa'
+    },
+    bookUrl: {
+      title: 'Booking page URL',
+      type: String,
+      default: '/boka'
     }
   },
 
